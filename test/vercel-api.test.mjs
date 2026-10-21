@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vercelFunction from '../api/v1/[...path].mjs';
+import deviceVerify from '../api/v1/device/verify.mjs';
+import deviceTelemetry from '../api/v1/device/telemetry.mjs';
+import deviceAlerts from '../api/v1/device/alerts.mjs';
+import deviceCommands from '../api/v1/device/commands.mjs';
+import commandResult from '../api/v1/device/commands/result.mjs';
 import { getConfig } from '../api/slide-api.mjs';
 
 test('Vercel API configuration no longer needs a dashboard password', async () => {
@@ -22,6 +27,27 @@ test('Vercel API configuration no longer needs a dashboard password', async () =
     assert.equal(response.status, 503);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await response.json(), { error: 'api_not_configured' });
+
+    const nestedRoutes = [
+      [deviceVerify, new Request('https://slide.akios.site/api/v1/device/verify', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      })],
+      [deviceTelemetry, new Request('https://slide.akios.site/api/v1/device/telemetry', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      })],
+      [deviceAlerts, new Request('https://slide.akios.site/api/v1/device/alerts', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      })],
+      [deviceCommands, new Request('https://slide.akios.site/api/v1/device/commands?boot_id=SLIDE1234')],
+      [commandResult, new Request('https://slide.akios.site/api/v1/device/commands/result', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+      })],
+    ];
+    for (const [route, request] of nestedRoutes) {
+      const nestedResponse = await route.fetch(request);
+      assert.equal(nestedResponse.status, 503);
+      assert.deepEqual(await nestedResponse.json(), { error: 'api_not_configured' });
+    }
   } finally {
     for (const [key, value] of previous) {
       if (value === undefined) delete process.env[key];

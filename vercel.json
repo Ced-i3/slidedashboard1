@@ -6,6 +6,9 @@
   "functions": {
     "api/v1/*.mjs": {
       "maxDuration": 30
+    },
+    "api/v1/**/*.mjs": {
+      "maxDuration": 30
     }
   }
 }

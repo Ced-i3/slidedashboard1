@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node --env-file=.env server/app.mjs",
-    "check": "node --check scripts/build.mjs && node --check server/app.mjs && node --check api/slide-api.mjs && node --check \"api/v1/[...path].mjs\" && node --check app.js && node --check sw.js",
+    "check": "node --check scripts/build.mjs && node --check server/app.mjs && node --check api/slide-api.mjs && node --check \"api/v1/[...path].mjs\" && node --check api/v1/device/verify.mjs && node --check api/v1/device/telemetry.mjs && node --check api/v1/device/alerts.mjs && node --check api/v1/device/commands.mjs && node --check api/v1/device/commands/result.mjs && node --check app.js && node --check sw.js",
     "test": "node --test"
   },
   "dependencies": {
