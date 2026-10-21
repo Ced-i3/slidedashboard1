@@ -2,7 +2,7 @@
 
 Base URL: `https://slide.akios.site/api/v1`. The firmware setup form currently accepts this host and base path only. TLS certificate and hostname validation remain enabled in the ESP32 HTTP client. Vercel serves the dashboard and Node.js API Function; the primary API persists data in Postgres through the Vercel Marketplace integration.
 
-Device requests send `Authorization: Bearer <SLIDE_DEVICE_TOKEN>` and `X-SLIDE-Device: <SLIDE_DEVICE_ID>`. Dashboard sign-in uses the operator password over HTTPS and receives a short-lived bearer session token. All user API routes require that token. Responses use `Cache-Control: no-store`.
+Device requests send `Authorization: Bearer <SLIDE_DEVICE_TOKEN>` and `X-SLIDE-Device: <SLIDE_DEVICE_ID>`. Dashboard routes are public: anyone can read station data, acknowledge alerts, view command history, and queue maintenance commands. Device ingestion and command polling still require the private device token. Responses use `Cache-Control: no-store`.
 
 ## Device routes
 
@@ -31,7 +31,7 @@ Device authentication or validation failures receive `401` or `400`; oversized J
 
 ## Dashboard routes
 
-`POST /session` accepts `{ "password": "…" }`. Authenticated routes are `GET /session`, `DELETE /session`, `GET /dashboard`, `GET /readings?range=24h|7d|30d`, `GET /readings.csv`, `GET /alerts`, `POST /alerts/ack`, and `GET|POST /commands`.
+Public dashboard routes are `GET /dashboard`, `GET /readings?range=24h|7d|30d`, `GET /readings.csv`, `GET /alerts`, `POST /alerts/ack`, and `GET|POST /commands`. There is no dashboard password or session route.
 
 Maintenance command kinds are `calibrate_mpu`, `set_test_mode`, `record_adc_endpoint`, `set_tilt_thresholds`, and `set_adc_settings`. Commands target the latest boot, expire after 120 seconds, and are accepted sequentially. Acknowledgment is server-side and does not change the firmware's active/resolved event state.
 
@@ -39,10 +39,10 @@ Maintenance command kinds are `calibrate_mpu`, `set_test_mode`, `record_adc_endp
 
 1. Import `Ced-i3/slidedashboard1` with the repository root as the Root Directory. The dashboard source is at the repository root; `vercel.json` runs its build script to create `dist`, while `api/v1/[...path].mjs` handles API routes. Build and output settings come from the repository, but Root Directory remains a Vercel project setting.
 2. Connect a Postgres storage integration from the Vercel Marketplace, such as Neon. Set its pooled connection string as `DATABASE_URL` in the Vercel project.
-3. Set `SLIDE_DEVICE_ID`, `SLIDE_DEVICE_TOKEN`, and `SLIDE_DASHBOARD_PASSWORD` as server-only Vercel environment variables. The device token must match the private firmware configuration; never expose it in frontend code.
+3. Set `SLIDE_DEVICE_ID` and `SLIDE_DEVICE_TOKEN` as server-only Vercel environment variables. The device token must match the private firmware configuration; never expose it in frontend code. No dashboard password is needed.
 4. Attach `slide.akios.site` to the production deployment and redeploy. On its first successful API request, the function creates the required tables if they do not exist. It returns `503 api_not_configured` when required database or credential settings are absent.
 
-The API uses persistent Postgres tables for device state, readings, alerts, commands, login attempts, and dashboard sessions. This is required because Vercel Function filesystems are not durable application storage.
+The API uses persistent Postgres tables for device state, readings, alerts, and commands. This is required because Vercel Function filesystems are not durable application storage. Dashboard data and controls are public, including GPS coordinates and the ability to change device settings.
 
 ## Orange Pi backup service
 

@@ -11,11 +11,12 @@ The Orange Pi Node service in `server/app.mjs` remains available as a manual bac
 3. Add these server-only environment variables to the Vercel project for Production and any environment where the ESP32 will connect:
    - `SLIDE_DEVICE_ID`: the configured device identifier.
    - `SLIDE_DEVICE_TOKEN`: a random token of at least 32 bytes, matching the firmware's private local secret header.
-   - `SLIDE_DASHBOARD_PASSWORD`: a unique password of at least 20 bytes.
 4. Redeploy after connecting the database and setting the variables. The build produces `dist/index.html`; a missing API configuration returns `503 api_not_configured` until those settings exist.
-5. Attach `slide.akios.site` to the production deployment and make the deployment public if the dashboard is intended for public access. The API still requires dashboard or device authentication.
+5. Attach `slide.akios.site` to the production deployment. Dashboard readings, GPS, alerts, command history, and maintenance controls are public to anyone on the internet.
 
-Do not commit database URLs, dashboard passwords, device tokens, or firmware secret headers. Keep the Neon connection string in Vercel's encrypted environment-variable settings.
+If `SLIDE_DASHBOARD_PASSWORD` is already set in Vercel, the code no longer reads it. Delete it under Project Settings > Environment Variables to remove it from the deployment configuration too.
+
+Do not commit database URLs, device tokens, or firmware secret headers. Keep the Neon connection string and device token in Vercel's encrypted environment-variable settings.
 
 ## Local Orange Pi backup service
 
@@ -31,7 +32,7 @@ This backup service is independent from the Vercel database. Switching the publi
 
 ## Data and device behavior
 
-- The Vercel API stores device state, readings, alerts, acknowledgments, commands, and dashboard sessions in Postgres. It prunes readings older than 30 days as new telemetry arrives.
+- The Vercel API stores device state, readings, alerts, acknowledgments, and commands in Postgres. It prunes readings older than 30 days as new telemetry arrives.
 - The Orange Pi backup stores the same API contract in SQLite when run independently.
 - The ESP32 sends current telemetry every five seconds and coalesces it during outages rather than building an unbounded backlog.
 - Event delivery uses a separate 24-entry RAM queue from the 12-item display history. It coalesces queued revisions per event, retries with capped jittered backoff, reports retry/drop counts, drops and counts the oldest queued event on overflow, and loses queued events on reboot.

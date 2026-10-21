@@ -2,13 +2,10 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const API = '/api/v1';
 const SVG = 'http://www.w3.org/2000/svg';
-const sessionKey = 'slide.dashboard.session';
 const sidebar = $('#sidebar');
 const scrim = $('#scrim');
 const modal = $('#modal');
 const toastHost = $('#toasts');
-const loginGate = $('#authGate');
-let sessionToken = sessionStorage.getItem(sessionKey) || '';
 let lastFocus = null;
 let dashboardSnapshot = null;
 let latestSettings = null;
@@ -58,29 +55,12 @@ function toast(title, message, type = '') {
   setTimeout(() => article.remove(), 6500);
 }
 
-function showLogin() {
-  sessionToken = '';
-  sessionStorage.removeItem(sessionKey);
-  loginGate.hidden = false;
-  $('#loginPassword').focus();
-}
-
-function hideLogin() {
-  loginGate.hidden = true;
-  $('#loginError').textContent = '';
-}
-
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
-  if (sessionToken) headers.set('Authorization', `Bearer ${sessionToken}`);
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${API}${path}`, {
     ...options, headers, cache: 'no-store', credentials: 'same-origin',
   });
-  if (response.status === 401) {
-    showLogin();
-    throw new Error('Sign in again to access the station.');
-  }
   if (!response.ok) {
     let message = `Station service returned ${response.status}.`;
     try { message = (await response.json()).message || message; } catch { /* Use the status text. */ }
@@ -95,30 +75,6 @@ async function getJson(path) {
 
 async function postJson(path, body) {
   return (await api(path, { method: 'POST', body: JSON.stringify(body) })).json();
-}
-
-function signIn(event) {
-  event.preventDefault();
-  const button = $('#loginForm button[type="submit"]');
-  const error = $('#loginError');
-  button.disabled = true;
-  error.textContent = '';
-  fetch(`${API}/session`, {
-    method: 'POST', cache: 'no-store', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: $('#loginPassword').value }),
-  }).then(async (response) => {
-    const result = await response.json();
-    if (!response.ok) throw new Error(response.status === 429
-      ? 'Too many attempts. Wait a little before trying again.'
-      : 'Password not accepted. Check with your station administrator.');
-    sessionToken = result.access_token;
-    sessionStorage.setItem(sessionKey, sessionToken);
-    $('#loginPassword').value = '';
-    hideLogin();
-    await refresh();
-  }).catch((cause) => { error.textContent = cause.message || 'Could not connect to the station service.'; })
-    .finally(() => { button.disabled = false; });
 }
 
 function closeModal() {
@@ -513,7 +469,6 @@ async function refreshSettings() {
 
 async function refresh() {
   if (refreshBusy) { refreshAgain = true; return; }
-  if (!sessionToken || loginGate.hidden === false) return;
   refreshBusy = true;
   try {
     const snapshot = await getJson('/dashboard');
@@ -526,7 +481,6 @@ async function refresh() {
     renderAlerts(alerts.alerts);
     if (location.hash === '#settings') await refreshSettings();
   } catch (error) {
-    if (loginGate.hidden === false) return;
     $('#live-banner').dataset.state = 'offline';
     $('#live-banner').textContent = `Station service unavailable: ${error.message}`;
     $('#mobileStatus').dataset.state = 'offline';
@@ -571,11 +525,6 @@ function bindControls() {
   $('#alertsButton').onclick = openModal;
   $$('[data-close]').forEach((element) => { element.onclick = closeModal; });
   addEventListener('keydown', (event) => { if (event.key === 'Escape') modal.hidden ? closeMenu() : closeModal(); });
-  $('#loginForm').addEventListener('submit', signIn);
-  $('#logoutButton').onclick = async () => {
-    try { await api('/session', { method: 'DELETE' }); } catch { /* Clear local access even if the service is offline. */ }
-    showLogin();
-  };
   $$('.periods button').forEach((button) => button.addEventListener('click', () => {
     $$('.periods button').forEach((item) => { item.classList.remove('active'); item.setAttribute('aria-pressed', 'false'); });
     button.classList.add('active'); button.setAttribute('aria-pressed', 'true');
@@ -626,6 +575,5 @@ bindControls();
 if ('serviceWorker' in navigator) addEventListener('load', () => {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 });
-if (sessionToken) hideLogin(); else showLogin();
 refresh();
 setInterval(() => { if (!document.hidden) refresh(); }, 5000);

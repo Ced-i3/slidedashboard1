@@ -139,7 +139,7 @@
     </section>
 
     <section class="view" data-page="settings" hidden>
-      <header><div><p class="eyebrow">Authenticated station controls</p><h1>Station settings</h1><p class="subtitle">Commands require an online station and expire if it disconnects.</p></div><button class="secondary" id="logoutButton" type="button">Sign out</button></header>
+      <header><div><p class="eyebrow">Public station controls</p><h1>Station settings</h1><p class="subtitle">Anyone on the internet can view station data, change device settings, and acknowledge events. Commands require an online station and expire if it disconnects.</p></div></header>
       <p id="command-feedback" class="live-banner" role="status">Control status loads from the station.</p>
       <div class="two-col settings-grid">
         <section class="panel form">
@@ -187,19 +187,6 @@
       <div id="alert-list" class="alerts" aria-live="polite">Waiting for events.</div>
     </section>
   </div>
-
-  <section class="auth-gate" id="authGate" hidden aria-labelledby="login-title">
-    <form id="loginForm" class="panel auth-card">
-      <img src="assets/slide-logo.png" alt="">
-      <p class="eyebrow">S.L.I.D.E. station service</p>
-      <h1 id="login-title">Sign in to monitor</h1>
-      <p>Use the dashboard password configured by your station administrator.</p>
-      <label for="loginPassword">Dashboard password</label>
-      <input id="loginPassword" type="password" autocomplete="current-password" minlength="1" required>
-      <button class="primary" type="submit">Sign in</button>
-      <p id="loginError" class="login-error" role="alert"></p>
-    </form>
-  </section>
 
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
   <script src="app.js" defer></script>

@@ -131,7 +131,7 @@ The dashboard is a strong presentation-ready prototype with a clear operational 
 
 ## Production priorities
 
-1. Connect authenticated, validated sensor and alert APIs with explicit stale/offline states.
+1. Connect public, validated sensor and alert APIs with explicit stale/offline states.
 2. Validate thresholds, terminology, and response procedures with domain authorities.
 3. Add chart data tables, screen-reader testing, contrast testing, and keyboard focus containment.
 4. Implement real alert confirmation, permissions, delivery tracking, and audit history.

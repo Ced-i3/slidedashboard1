@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual, randomUUID } from 'node:crypto';
+import { createHash, timingSafeEqual, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdir, readFile, stat } from 'node:fs/promises';
@@ -11,15 +11,11 @@ const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 8080);
 const DEVICE_ID = process.env.SLIDE_DEVICE_ID || '';
 const DEVICE_TOKEN = process.env.SLIDE_DEVICE_TOKEN || '';
-const DASHBOARD_PASSWORD = process.env.SLIDE_DASHBOARD_PASSWORD || '';
 const MAX_BODY = 32 * 1024;
 const TELEMETRY_STALE_MS = 15_000;
 const DEVICE_OFFLINE_MS = 60_000;
 const COMMAND_TTL_MS = 120_000;
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-const sessions = new Map();
-const failedLogins = new Map();
 const MIME = new Map([
   ['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'], ['.webmanifest', 'application/manifest+json'],
@@ -37,11 +33,8 @@ if (DEVICE_ID.length < 1 || DEVICE_ID.length > 64 || !/^[A-Za-z0-9._-]+$/.test(D
   fatal('SLIDE_DEVICE_ID must be 1–64 letters, digits, dots, underscores, or hyphens');
 if (Buffer.byteLength(DEVICE_TOKEN) < 32 || DEVICE_TOKEN.startsWith('replace-with-'))
   fatal('set SLIDE_DEVICE_TOKEN to a unique random secret of at least 32 bytes');
-if (Buffer.byteLength(DASHBOARD_PASSWORD) < 20 || DASHBOARD_PASSWORD.startsWith('replace-with-'))
-  fatal('set SLIDE_DASHBOARD_PASSWORD to a unique secret of at least 20 bytes');
 
 const deviceTokenHash = createHash('sha256').update(DEVICE_TOKEN).digest();
-const dashboardPasswordHash = createHash('sha256').update(DASHBOARD_PASSWORD).digest();
 const deviceIdPattern = /^[A-Za-z0-9._-]{1,64}$/;
 const bootIdPattern = /^[A-Za-z0-9_-]{8,32}$/;
 const eventIdPattern = /^[A-Za-z0-9._:-]{1,64}$/;
@@ -205,17 +198,6 @@ function requireDevice(request, response) {
   return true;
 }
 
-function requireDashboard(request, response) {
-  const match = /^Bearer ([A-Za-z0-9_-]{32,200})$/.exec(request.headers.authorization || '');
-  const session = match && sessions.get(match[1]);
-  if (!session || session.expiresAt <= Date.now()) {
-    if (match) sessions.delete(match[1]);
-    json(response, 401, { error: 'dashboard_login_required' });
-    return null;
-  }
-  return session;
-}
-
 function validateBoot(value) { return typeof value === 'string' && bootIdPattern.test(value); }
 
 function validateTelemetry(body) {
@@ -301,28 +283,6 @@ function validateEvent(body) {
       (event.gps_status === 'UNAVAILABLE' && event.latitude !== null) ||
       (event.gps_status !== 'UNAVAILABLE' && event.latitude === null)) return 'Event GPS coordinates and status are inconsistent.';
   return null;
-}
-
-function sessionLogin(response, request, body) {
-  const ip = request.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-  const limit = failedLogins.get(ip) || { count: 0, since: now };
-  if (now - limit.since > 15 * 60_000) { limit.count = 0; limit.since = now; }
-  if (limit.count >= 5) {
-    json(response, 429, { error: 'login_rate_limited' }, { 'Retry-After': '900' });
-    return;
-  }
-  const supplied = typeof body.password === 'string' ? body.password : '';
-  if (Buffer.byteLength(supplied) > 1024 || !constantTimeEqual(supplied, dashboardPasswordHash)) {
-    limit.count += 1;
-    failedLogins.set(ip, limit);
-    json(response, 401, { error: 'incorrect_password' });
-    return;
-  }
-  failedLogins.delete(ip);
-  const token = randomBytes(32).toString('base64url');
-  sessions.set(token, { expiresAt: now + SESSION_TTL_MS, username: 'operator' });
-  json(response, 200, { access_token: token, expires_in: SESSION_TTL_MS / 1000 });
 }
 
 function readLimit(url, fallback = 100) {
@@ -450,12 +410,6 @@ function commandPayload(body) {
 
 async function handleApi(request, response, url) {
   const pathname = url.pathname;
-  if (pathname === '/api/v1/session' && request.method === 'POST') {
-    const body = await readJson(request, response);
-    if (body) sessionLogin(response, request, body);
-    return;
-  }
-
   if (pathname === '/api/v1/device/verify' && request.method === 'POST') {
     if (!requireDevice(request, response)) return;
     const body = await readJson(request, response);
@@ -575,20 +529,6 @@ async function handleApi(request, response, url) {
     return;
   }
 
-  const session = requireDashboard(request, response);
-  if (!session) return;
-
-  if (pathname === '/api/v1/session' && request.method === 'GET') {
-    json(response, 200, { authenticated: true, username: session.username,
-      expires_in: Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000)) });
-    return;
-  }
-  if (pathname === '/api/v1/session' && request.method === 'DELETE') {
-    const token = /^Bearer ([A-Za-z0-9_-]+)$/.exec(request.headers.authorization || '')?.[1];
-    if (token) sessions.delete(token);
-    json(response, 200, { authenticated: false });
-    return;
-  }
   if (pathname === '/api/v1/dashboard' && request.method === 'GET') {
     json(response, 200, dashboardState());
     return;
@@ -610,7 +550,7 @@ async function handleApi(request, response, url) {
     }
     const acknowledgement = db.prepare(`UPDATE alerts SET acknowledged_at=?,acknowledged_by=?
       WHERE device_id=? AND event_id=? AND acknowledged_at IS NULL`)
-      .run(new Date().toISOString(), session.username, DEVICE_ID, body.event_id);
+      .run(new Date().toISOString(), 'public visitor', DEVICE_ID, body.event_id);
     if (!acknowledgement.changes) {
       const exists = findAlert.get(DEVICE_ID, body.event_id);
       if (!exists) { json(response, 404, { error: 'event_not_found' }); return; }

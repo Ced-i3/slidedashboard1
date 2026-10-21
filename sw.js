@@ -1,4 +1,4 @@
-const CACHE_NAME='slide-shell-v1.2.3';
+const CACHE_NAME='slide-shell-v1.2.4';
 const APP_SHELL=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/slide-logo.png','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable-512.png'];
 
 self.addEventListener('install',event=>{
@@ -12,8 +12,8 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const requestUrl=new URL(event.request.url);
-  // Station readings, sessions, exports and commands must always come from
-  // the live same-origin API. Never cache authenticated or last-known data.
+  // Station readings, exports and commands must always come from the live
+  // same-origin API. Never cache sensor data or last-known values.
   if(requestUrl.origin!==self.location.origin||requestUrl.pathname.startsWith('/api/')||requestUrl.pathname==='/healthz')return;
   if(event.request.mode==='navigate'){
     event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put('./index.html',copy));return response;}).catch(()=>caches.match('./index.html')));

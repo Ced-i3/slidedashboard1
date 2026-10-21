@@ -1,11 +1,10 @@
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Pool } from '@neondatabase/serverless';
 
 const MAX_BODY = 32 * 1024;
 const TELEMETRY_STALE_MS = 15_000;
 const DEVICE_OFFLINE_MS = 60_000;
 const COMMAND_TTL_MS = 120_000;
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const bootIdPattern = /^[A-Za-z0-9_-]{8,32}$/;
 const eventIdPattern = /^[A-Za-z0-9._:-]{1,64}$/;
@@ -59,17 +58,6 @@ CREATE TABLE IF NOT EXISTS commands (
 );
 CREATE INDEX IF NOT EXISTS commands_pending
   ON commands(device_id, target_boot_id, state, created_at);
-CREATE TABLE IF NOT EXISTS dashboard_sessions (
-  token_hash TEXT PRIMARY KEY,
-  username TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL
-);
-CREATE INDEX IF NOT EXISTS dashboard_sessions_expiry ON dashboard_sessions(expires_at);
-CREATE TABLE IF NOT EXISTS login_attempts (
-  client_hash TEXT PRIMARY KEY,
-  attempt_count INTEGER NOT NULL,
-  window_started_at TIMESTAMPTZ NOT NULL
-);
 `;
 
 let schemaReady = false;
@@ -84,16 +72,14 @@ function json(status, value, headers = {}) {
   } });
 }
 
-function getConfig() {
+export function getConfig() {
   const deviceId = process.env.SLIDE_DEVICE_ID || '';
   const deviceToken = process.env.SLIDE_DEVICE_TOKEN || '';
-  const dashboardPassword = process.env.SLIDE_DASHBOARD_PASSWORD || '';
   const databaseUrl = process.env.DATABASE_URL || '';
   if (!databaseUrl || !/^postgres(?:ql)?:\/\//i.test(databaseUrl) ||
       !/^[A-Za-z0-9._-]{1,64}$/.test(deviceId) ||
-      Buffer.byteLength(deviceToken) < 32 || deviceToken.startsWith('replace-with-') ||
-      Buffer.byteLength(dashboardPassword) < 20 || dashboardPassword.startsWith('replace-with-')) return null;
-  return { deviceId, deviceToken, dashboardPassword, databaseUrl };
+      Buffer.byteLength(deviceToken) < 32 || deviceToken.startsWith('replace-with-')) return null;
+  return { deviceId, deviceToken, databaseUrl };
 }
 
 async function ensureSchema(client, config) {
@@ -270,16 +256,6 @@ async function requireDevice(request, config) {
   return true;
 }
 
-async function requireDashboard(client, request) {
-  const token = bearer(request);
-  if (!token) return null;
-  const result = await client.query(
-    'SELECT username,expires_at FROM dashboard_sessions WHERE token_hash=$1 AND expires_at > NOW()',
-    [createHash('sha256').update(token).digest('hex')],
-  );
-  return result.rows[0] || null;
-}
-
 function asIso(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -364,32 +340,6 @@ async function loadAlerts(client, url, deviceId) {
   });
 }
 
-async function login(client, request, body, config) {
-  const forwarded = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim();
-  const ip = forwarded || request.headers.get('x-real-ip') || 'unknown';
-  const clientHash = createHash('sha256').update(config.dashboardPassword).update(ip).digest('hex');
-  const attempt = await client.query(`INSERT INTO login_attempts(client_hash,attempt_count,window_started_at)
-    VALUES($1,1,NOW()) ON CONFLICT(client_hash) DO UPDATE SET
-      attempt_count=CASE WHEN login_attempts.window_started_at <= NOW() - INTERVAL '15 minutes'
-        THEN 1 ELSE login_attempts.attempt_count + 1 END,
-      window_started_at=CASE WHEN login_attempts.window_started_at <= NOW() - INTERVAL '15 minutes'
-        THEN NOW() ELSE login_attempts.window_started_at END
-    RETURNING attempt_count`, [clientHash]);
-  if (attempt.rows[0].attempt_count > 5)
-    return json(429, { error: 'login_rate_limited' }, { 'Retry-After': '900' });
-
-  const supplied = typeof body.password === 'string' ? body.password : '';
-  if (Buffer.byteLength(supplied) > 1024 || !constantTimeEqual(supplied, sha256(config.dashboardPassword))) {
-    return json(401, { error: 'incorrect_password' });
-  }
-  await client.query('DELETE FROM login_attempts WHERE client_hash=$1', [clientHash]);
-  await client.query('DELETE FROM dashboard_sessions WHERE expires_at <= NOW()');
-  const token = randomBytes(32).toString('base64url');
-  await client.query('INSERT INTO dashboard_sessions(token_hash,username,expires_at) VALUES($1,$2,$3)',
-    [createHash('sha256').update(token).digest('hex'), 'operator', new Date(Date.now() + SESSION_TTL_MS).toISOString()]);
-  return json(200, { access_token: token, expires_in: SESSION_TTL_MS / 1000 });
-}
-
 function csvCell(value) {
   const text = String(value ?? '');
   const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
@@ -398,12 +348,6 @@ function csvCell(value) {
 
 async function route(client, request, url, config) {
   const pathname = url.pathname;
-  if (pathname === '/api/v1/session' && request.method === 'POST') {
-    const parsed = await readJson(request);
-    if (parsed.error) return parsed.error;
-    return login(client, request, parsed.body, config);
-  }
-
   if (pathname === '/api/v1/device/verify' && request.method === 'POST') {
     if (!await requireDevice(request, config)) return json(401, { error: 'device_authentication_failed' });
     const parsed = await readJson(request);
@@ -553,18 +497,6 @@ async function route(client, request, url, config) {
     }
   }
 
-  const session = await requireDashboard(client, request);
-  if (!session) return json(401, { error: 'dashboard_login_required' });
-
-  if (pathname === '/api/v1/session' && request.method === 'GET')
-    return json(200, { authenticated: true, username: session.username,
-      expires_in: Math.max(0, Math.floor((new Date(session.expires_at).valueOf() - Date.now()) / 1000)) });
-  if (pathname === '/api/v1/session' && request.method === 'DELETE') {
-    const token = bearer(request);
-    if (token) await client.query('DELETE FROM dashboard_sessions WHERE token_hash=$1',
-      [createHash('sha256').update(token).digest('hex')]);
-    return json(200, { authenticated: false });
-  }
   if (pathname === '/api/v1/dashboard' && request.method === 'GET')
     return json(200, await dashboardState(client, config.deviceId));
   if (pathname === '/api/v1/readings' && request.method === 'GET') {
@@ -585,7 +517,7 @@ async function route(client, request, url, config) {
       return json(400, { error: 'invalid_request', message: 'A valid event_id is required.' });
     const acknowledgement = await client.query(`UPDATE alerts SET acknowledged_at=NOW(),acknowledged_by=$1
       WHERE device_id=$2 AND event_id=$3 AND acknowledged_at IS NULL`,
-    [session.username, config.deviceId, eventId]);
+    ['public visitor', config.deviceId, eventId]);
     if (!acknowledgement.rowCount) {
       const exists = await client.query('SELECT 1 FROM alerts WHERE device_id=$1 AND event_id=$2',
         [config.deviceId, eventId]);

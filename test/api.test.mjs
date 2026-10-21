@@ -59,11 +59,10 @@ function telemetry(sequence, observedAt = new Date().toISOString()) {
   };
 }
 
-test('dashboard API validates auth and preserves telemetry and command lifecycle rules', async (t) => {
+test('public dashboard controls preserve device authentication and command lifecycle rules', async (t) => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'slide-api-test-'));
   const port = await freePort();
   const deviceToken = 'test-device-token-'.padEnd(48, 'x');
-  const password = 'test-dashboard-password-123';
   const bootId = 'BOOTTEST1234567890';
   const child = spawn(process.execPath, ['server/app.mjs'], {
     cwd: ROOT,
@@ -71,7 +70,6 @@ test('dashboard API validates auth and preserves telemetry and command lifecycle
       ...process.env,
       HOST: '127.0.0.1', PORT: String(port), SLIDE_DATA_DIR: dataDir,
       SLIDE_DEVICE_ID: 'SLIDE-TEST', SLIDE_DEVICE_TOKEN: deviceToken,
-      SLIDE_DASHBOARD_PASSWORD: password,
     },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
@@ -95,6 +93,9 @@ test('dashboard API validates auth and preserves telemetry and command lifecycle
     const page = await fetch(base);
     assert.equal(page.status, 200);
     assert.match(page.headers.get('content-type') || '', /text\/html/);
+    const pageHtml = await page.text();
+    assert.match(pageHtml, /Public station controls/);
+    assert.doesNotMatch(pageHtml, /authGate|loginPassword|Dashboard password|Sign in to monitor/);
     const script = await fetch(`${base}/app.js`);
     assert.equal(script.status, 200);
     assert.match(script.headers.get('content-type') || '', /javascript/);
@@ -104,17 +105,7 @@ test('dashboard API validates auth and preserves telemetry and command lifecycle
     assert.equal((await fetch(`${base}/README.md`)).status, 404, 'server must not expose repository files');
     assert.equal((await fetch(`${base}/server/app.mjs`)).status, 404, 'server source must not be served');
 
-    const unauthenticated = await fetch(`${base}/api/v1/dashboard`);
-    assert.equal(unauthenticated.status, 401);
-
-    const login = await fetch(`${base}/api/v1/session`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-    assert.equal(login.status, 200);
-    const sessionToken = (await login.json()).access_token;
-    assert.equal(typeof sessionToken, 'string');
-    const dashboardHeaders = { authorization: `Bearer ${sessionToken}`, 'content-type': 'application/json' };
+    const publicHeaders = { 'content-type': 'application/json' };
     const deviceHeaders = {
       authorization: `Bearer ${deviceToken}`, 'x-slide-device': 'SLIDE-TEST',
       'content-type': 'application/json',
@@ -125,6 +116,10 @@ test('dashboard API validates auth and preserves telemetry and command lifecycle
       body: JSON.stringify({ schema_version: 1, device_id: 'SLIDE-TEST', boot_id: bootId }),
     });
     assert.equal(unauthorizedDevice.status, 401);
+    assert.equal((await fetch(`${base}/api/v1/device/commands?boot_id=${bootId}`)).status, 401,
+      'device command polling still requires device authentication');
+    assert.equal((await fetch(`${base}/api/v1/session`)).status, 404,
+      'dashboard session routes are removed');
 
     const sendTelemetry = async (sequence, observedAt) => fetch(`${base}/api/v1/device/telemetry`, {
       method: 'POST', headers: deviceHeaders, body: JSON.stringify(telemetry(sequence, observedAt)),
@@ -142,24 +137,47 @@ test('dashboard API validates auth and preserves telemetry and command lifecycle
 
     const staleObservation = new Date(Date.now() - 60_000).toISOString();
     assert.equal((await sendTelemetry(4, staleObservation)).status, 202);
-    const dashboard = await fetch(`${base}/api/v1/dashboard`, { headers: dashboardHeaders });
+    const dashboard = await fetch(`${base}/api/v1/dashboard`);
     const snapshot = await dashboard.json();
     assert.equal(dashboard.status, 200);
     assert.equal(snapshot.latest.sequence, 4);
     assert.equal(snapshot.telemetry_stale, true, 'old device observation is stale even when just received');
+    assert.equal((await fetch(`${base}/api/v1/readings?range=24h`)).status, 200);
+
+    const alert = {
+      schema_version: 1, device_id: 'SLIDE-TEST', boot_id: bootId, event_id: 'EVENT-123',
+      revision: 1, observed_uptime_s: 15, occurred_at: new Date().toISOString(),
+      event: { severity: 'WARNING', sensor: 'TILT', value: 5, threshold: 4, duration_s: 5,
+        resolved: false, simulated: false, gps_status: 'UNAVAILABLE', latitude: null,
+        longitude: null, satellites: -1, fix_age_s: null },
+    };
+    const postedAlert = await fetch(`${base}/api/v1/device/alerts`, {
+      method: 'POST', headers: deviceHeaders, body: JSON.stringify(alert),
+    });
+    assert.equal(postedAlert.status, 202);
+    const publicAlerts = await fetch(`${base}/api/v1/alerts`);
+    assert.equal(publicAlerts.status, 200);
+    assert.equal((await publicAlerts.json()).alerts.length, 1);
+    const acknowledged = await fetch(`${base}/api/v1/alerts/ack`, {
+      method: 'POST', headers: publicHeaders, body: JSON.stringify({ event_id: alert.event_id }),
+    });
+    assert.equal(acknowledged.status, 200, 'any visitor can acknowledge an alert');
+    assert.deepEqual(await acknowledged.json(), { acknowledged: true, changed: true });
 
     const extraField = await fetch(`${base}/api/v1/commands`, {
-      method: 'POST', headers: dashboardHeaders,
+      method: 'POST', headers: publicHeaders,
       body: JSON.stringify({ kind: 'set_test_mode', enabled: true, unexpected: 1 }),
     });
     assert.equal(extraField.status, 400);
 
     const queued = await fetch(`${base}/api/v1/commands`, {
-      method: 'POST', headers: dashboardHeaders,
+      method: 'POST', headers: publicHeaders,
       body: JSON.stringify({ kind: 'set_test_mode', enabled: true }),
     });
     assert.equal(queued.status, 202);
     const commandId = (await queued.json()).command_id;
+    assert.equal((await fetch(`${base}/api/v1/commands?limit=25`)).status, 200,
+      'maintenance command history is public');
     const poll = await fetch(`${base}/api/v1/device/commands?boot_id=${bootId}`, { headers: deviceHeaders });
     const commands = (await poll.json()).commands;
     assert.equal(poll.status, 200);
