@@ -94,7 +94,7 @@ test('public dashboard controls preserve device authentication and command lifec
     assert.equal(page.status, 200);
     assert.match(page.headers.get('content-type') || '', /text\/html/);
     const pageHtml = await page.text();
-    assert.match(pageHtml, /Public station controls/);
+    assert.match(pageHtml, /Automatic browser alerts/);
     assert.doesNotMatch(pageHtml, /authGate|loginPassword|Dashboard password|Sign in to monitor/);
     assert.match(pageHtml, /Soil ADC/);
     assert.match(pageHtml, /MPU pitch \/ roll/);
@@ -108,6 +108,10 @@ test('public dashboard controls preserve device authentication and command lifec
     assert.match(appScript, /readings\.pitch_deg/);
     assert.match(appScript, /readings\.humidity_pct/);
     assert.doesNotMatch(appScript, /Uncalibrated/);
+    const thresholdModule = await fetch(`${base}/threshold-alerts.js`);
+    assert.equal(thresholdModule.status, 200, 'the browser alert module must be served by the backup runtime');
+    assert.match(thresholdModule.headers.get('content-type') || '', /javascript/);
+    assert.match(await thresholdModule.text(), /export class ThresholdAlerts/);
     const icon = await fetch(`${base}/assets/icon-192.png`);
     assert.equal(icon.status, 200);
     assert.match(icon.headers.get('content-type') || '', /image\/png/);

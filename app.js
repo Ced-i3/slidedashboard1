@@ -1,3 +1,5 @@
+import { DEFAULT_THRESHOLDS, ThresholdAlerts, validateThresholds, absoluteMpuAngle, telemetryFresh } from './threshold-alerts.js';
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const API = '/api/v1';
@@ -8,7 +10,9 @@ const modal = $('#modal');
 const toastHost = $('#toasts');
 let lastFocus = null;
 let dashboardSnapshot = null;
-let latestSettings = null;
+let webAlerts = new ThresholdAlerts();
+let thresholdStorageKey = null;
+let serverEvents = [];
 let activeRange = '24h';
 let shownEvents = new Set();
 let eventsInitiallyLoaded = false;
@@ -59,7 +63,7 @@ async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const response = await fetch(`${API}${path}`, {
-    ...options, headers, cache: 'no-store', credentials: 'same-origin',
+    signal: AbortSignal.timeout(8000), ...options, headers, cache: 'no-store', credentials: 'same-origin',
   });
   if (!response.ok) {
     let message = `Station service returned ${response.status}.`;
@@ -88,7 +92,7 @@ function openModal() {
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
   $('.modal-head button').focus();
-  refreshAlerts();
+  refreshAlerts().catch((error) => toast('Device history unavailable', error.message, 'watch'));
 }
 
 function formatTime(value, unavailable = 'Unavailable') {
@@ -191,6 +195,10 @@ function updateNetworkState(snapshot) {
 
 function renderOverview(snapshot) {
   dashboardSnapshot = snapshot;
+  loadBrowserThresholds(snapshot.device?.id);
+  const notices = webAlerts.update(snapshot);
+  for (const record of notices) toast(`${record.event.severity} · ${record.event.sensor}`, `${record.event.value} measured · ${record.event.threshold} threshold`, 'watch');
+  renderBrowserAlertState();
   updateNetworkState(snapshot);
   const device = snapshot.device || {};
   const latest = snapshot.latest;
@@ -215,40 +223,39 @@ function renderOverview(snapshot) {
     $('#site-coordinates').textContent = 'Coordinates unavailable.';
     $('#site-gps-status').textContent = 'Unavailable';
     $('#site-satellites').textContent = 'Unavailable';
-    $('#site-baseline').textContent = 'Unavailable';
-    $('#site-test-mode').textContent = 'Off or unavailable';
+    $('#site-alert-mode').textContent = 'Waiting for telemetry';
     $('#map-empty').hidden = false;
     $('#map-empty').textContent = 'Station coordinates are not available yet.';
     $('#map-marker').hidden = true;
-    renderMaintenance(null);
     return;
   }
 
   const readings = latest.readings || {};
   const health = latest.health || {};
   const gps = latest.gps || {};
+  const fresh = telemetryFresh(snapshot);
   showMeasurement($('#soil-reading'), readings.soil_adc_raw, 'ADC', 0);
-  sensorState('soil-state', health.soil || 'Unknown');
+  sensorState('soil-state', !fresh ? 'Stale' : health.soil || 'Unknown');
   $('#soil-detail').textContent = readings.soil_adc_raw === null || readings.soil_adc_raw === undefined
     ? 'Raw ADC reading unavailable.' : 'Direct raw analog-to-digital sensor count.';
 
   showMeasurement($('#pitch-reading'), readings.pitch_deg, '\u00b0', 0, true);
   showMeasurement($('#roll-reading'), readings.roll_deg, '\u00b0', 0, true);
-  sensorState('tilt-state', health.mpu || 'Unknown');
-  $('#tilt-detail').textContent = 'Pitch and roll from the current MPU reading.';
+  sensorState('tilt-state', !fresh ? 'Stale' : health.mpu || 'Unknown');
+  const angle = absoluteMpuAngle(readings);
+  $('#tilt-detail').textContent = angle === null ? 'Waiting for valid pitch and roll.' : `Alert angle ${angle.toFixed(1)}° = max(|pitch|, |roll|). No baseline or test mode required.`;
 
   showMeasurement($('#rain-reading'), readings.rain_adc_raw, 'ADC', 0);
-  sensorState('rain-state', health.rain || 'Unknown');
+  sensorState('rain-state', !fresh ? 'Stale' : health.rain || 'Unknown');
   $('#rain-detail').textContent = readings.rain_adc_raw === null || readings.rain_adc_raw === undefined
     ? 'Raw rain-plate ADC reading unavailable.' : 'Direct raw analog-to-digital sensor count.';
 
   showMeasurement($('#air-temperature'), readings.temperature_c, '\u00b0C', 0);
   showMeasurement($('#air-humidity'), readings.humidity_pct, '% RH', 0);
-  sensorState('air-state', health.dht11 || 'Unknown');
+  sensorState('air-state', !fresh ? 'Stale' : health.dht11 || 'Unknown');
   $('#air-detail').textContent = 'Temperature and humidity from the DHT11 sensor.';
 
-  $('#site-baseline').textContent = health.baseline_calibrated ? 'Calibrated' : 'Required';
-  $('#site-test-mode').textContent = health.test_mode ? 'Enabled for this boot' : 'Off';
+  $('#site-alert-mode').textContent = fresh ? 'Automatic in this browser' : 'Paused · readings stale';
   $('#site-gps-status').textContent = gps.status || 'Unavailable';
   $('#site-satellites').textContent = Number.isInteger(gps.satellites) && gps.satellites >= 0
     ? String(gps.satellites) : 'Unavailable';
@@ -264,13 +271,12 @@ function renderOverview(snapshot) {
     $('#map-empty').textContent = 'Station coordinates are not available yet.';
     $('#map-marker').hidden = true;
   }
-  renderMaintenance(latest);
 }
 
 function timeRange(readings, key) {
   const values = readings.map((row) => ({ at: row.received_at, value: key(row) }))
     .filter((sample) => Number.isFinite(sample.value) && sample.at);
-  if (!values.length) return 'No calibrated samples in this period.';
+  if (!values.length) return 'No valid samples in this period.';
   const low = Math.min(...values.map((sample) => sample.value));
   const high = Math.max(...values.map((sample) => sample.value));
   return `${values.length} samples · ${low.toFixed(1)}–${high.toFixed(1)} · ${formatTime(values[0].at, '')} to ${formatTime(values.at(-1).at, '')}`;
@@ -289,7 +295,7 @@ function renderTrend(svgId, rangeId, rows, pick, colour) {
   const series = rows.map((row, index) => ({ index, value: pick(row) }));
   const values = series.map((sample) => sample.value).filter(Number.isFinite);
   if (!values.length) {
-    $('#'+rangeId).textContent = 'No calibrated samples in this period.';
+    $('#'+rangeId).textContent = 'No valid samples in this period.';
     return;
   }
   const minimum = Math.min(...values);
@@ -325,10 +331,9 @@ function readingsRangeUrl(range) { return `/readings?range=${encodeURIComponent(
 function renderChart(readings) {
   const rows = readings || [];
   renderTrend('soil-chart', 'soil-chart-range', rows,
-    (row) => row.readings?.soil_wetness_pct, '#a96c00');
+    (row) => row.health?.soil === 'ONLINE' ? row.readings?.soil_adc_raw : null, '#a96c00');
   renderTrend('tilt-chart', 'tilt-chart-range', rows,
-    (row) => row.health?.baseline_calibrated && row.health?.mpu === 'ONLINE'
-      ? row.readings?.relative_tilt_deg : null, '#1c8b4b');
+    (row) => row.health?.mpu === 'ONLINE' ? absoluteMpuAngle(row.readings) : null, '#1c8b4b');
   renderTrend('air-chart', 'air-chart-range', rows,
     (row) => row.readings?.temperature_c, '#df454b');
 }
@@ -353,7 +358,7 @@ function renderHistory(readings) {
       `uptime ${Math.floor((sample.observed_uptime_ms || 0) / 1000)} s`),
     `${textCell(readings.soil_adc_raw)} ADC / ${textCell(readings.soil_wetness_pct)}%`,
     `${textCell(readings.rain_adc_raw)} ADC / ${textCell(readings.rain_wetness_pct)}%`,
-    readings.relative_tilt_deg == null || !health.baseline_calibrated ? '—' : `${Number(readings.relative_tilt_deg).toFixed(2)}°`,
+    health.mpu === 'ONLINE' && absoluteMpuAngle(readings) !== null ? `${absoluteMpuAngle(readings).toFixed(2)}°` : '—',
     readings.temperature_c == null ? '—' : `${Number(readings.temperature_c).toFixed(1)}°C`,
     `MPU ${textCell(health.mpu)} · Soil ${textCell(health.soil)} · Rain ${textCell(health.rain)} · DHT11 ${textCell(health.dht11)}`];
     values.forEach((value) => { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); });
@@ -370,12 +375,13 @@ function makeButton(label, className, handler) {
 
 function renderAlerts(alerts) {
   const holder = $('#alert-list'); holder.replaceChildren();
-  const events = alerts || [];
+  if (alerts) serverEvents = alerts;
+  const events = [...webAlerts.events, ...serverEvents].sort((a, b) => Date.parse(b.occurred_at || b.received_at) - Date.parse(a.occurred_at || a.received_at));
   const activeCount = events.filter((event) => !event.event?.resolved).length;
   const badge = $('#alertCount');
   badge.hidden = activeCount === 0;
   badge.textContent = String(activeCount);
-  if (!events.length) { holder.textContent = 'No experimental events have been recorded.'; return; }
+  if (!events.length) { holder.textContent = 'No browser or device events have been recorded.'; return; }
   for (const event of events) {
     const card = document.createElement('article');
     const time = document.createElement('time');
@@ -386,14 +392,16 @@ function renderAlerts(alerts) {
     time.dateTime = event.occurred_at || event.received_at || '';
     time.textContent = formatTime(event.occurred_at || event.received_at,
       `uptime ${event.observed_uptime_s || 0} s`);
-    title.textContent = `${event.event?.simulated ? 'SIMULATED · ' : ''}${event.event?.severity || 'EVENT'} · ${event.event?.sensor || 'sensor'}`;
+    title.textContent = `${event.source === 'browser' ? 'BROWSER · ' : 'DEVICE · '}${event.event?.simulated ? 'SIMULATED · ' : ''}${event.event?.severity || 'EVENT'} · ${event.event?.sensor || 'sensor'}`;
     details.textContent = `${event.event?.value ?? '—'} measured · ${event.event?.threshold ?? '—'} threshold · ${event.event?.duration_s ?? '—'} seconds · GPS ${event.event?.gps_status || 'UNAVAILABLE'} · ${event.event?.resolved ? 'resolved' : 'active'}`;
+    if (event.source === 'browser') details.textContent = `${event.event.value}${event.event.sensor === 'MPU_ANGLE' ? '°' : ' ADC'} ${event.event.direction === 'below' ? '≤' : '≥'} ${event.event.threshold} threshold · ${event.event.resolved ? 'closed: ' + event.event.reason : event.event.stale ? 'STALE: current condition unknown' : 'active'}`;
     status.className = `tag ${event.event?.resolved ? '' : 'watch'}`;
     status.textContent = event.acknowledged ? `Acknowledged${event.acknowledged_by ? ` by ${event.acknowledged_by}` : ''}` : 'Not acknowledged';
     content.append(title, details, status);
     if (!event.acknowledged) {
       content.append(makeButton('Acknowledge', 'secondary ack-button', async () => {
         try {
+          if (event.source === 'browser') { event.acknowledged = true; renderAlerts(); return; }
           await postJson('/alerts/ack', { event_id: event.event_id });
           toast('Event acknowledged', 'The sensor condition keeps its current state.');
           await refreshAlerts();
@@ -407,61 +415,78 @@ function renderAlerts(alerts) {
     }
     card.append(time, content); holder.append(card);
     const eventKey = `${event.event_id}:${event.revision}`;
-    if (eventsInitiallyLoaded && !shownEvents.has(eventKey)) {
+    if (event.source !== 'browser' && eventsInitiallyLoaded && !shownEvents.has(eventKey)) {
       toast(`New experimental ${event.event?.severity || 'sensor'} event`, `${event.event?.sensor || 'Station'} · ${event.event?.resolved ? 'resolved' : 'active'}`, 'watch');
     }
-    shownEvents.add(eventKey);
+    if (event.source !== 'browser') shownEvents.add(eventKey);
   }
-  eventsInitiallyLoaded = true;
+  shownEvents = new Set(serverEvents.map((event) => `${event.event_id}:${event.revision}`));
+  if (alerts !== undefined) eventsInitiallyLoaded = true;
 }
 
 async function refreshAlerts() {
+  renderAlerts();
   const result = await getJson('/alerts?limit=100');
   renderAlerts(result.alerts);
 }
 
-function renderMaintenance(snapshot) {
-  const calibration = snapshot?.calibration;
-  const settings = snapshot?.settings;
-  latestSettings = settings || null;
-  $('#calibration-detail').textContent = calibration
-    ? `${calibration.baseline_valid ? 'Baseline calibrated' : 'Baseline required'} · ${calibration.calibrating ? 'Calibration running' : calibration.reason || 'No active calibration'} · Gyro bias ${Array.isArray(calibration.gyro_bias_dps) ? calibration.gyro_bias_dps.map((value) => Number(value).toFixed(2)).join(', ') : 'unavailable'} °/s`
-    : 'Station calibration data is unavailable.';
-  $('#testModeToggle').checked = settings?.test_mode === true;
-  if (settings?.tilt_threshold && settings?.tilt_duration_s) {
-    ['caution','warning','critical'].forEach((key, index) => {
-      $(`#${key}`).value = settings.tilt_threshold[index];
-      $(`#${key}-s`).value = settings.tilt_duration_s[index];
+function populateThresholds() {
+  const cfg = webAlerts.config;
+  $('#mpu-enabled').checked = cfg.mpu.enabled;
+  for (const level of ['caution', 'warning', 'critical']) $(`#${level}`).value = cfg.mpu[level];
+  for (const sensor of ['soil', 'rain']) {
+    $(`#${sensor}-threshold`).value = cfg[sensor].threshold;
+    $(`#${sensor}-direction`).value = cfg[sensor].direction;
+    $(`#${sensor}-enabled`).checked = cfg[sensor].enabled;
+  }
+}
+
+function loadBrowserThresholds(deviceId) {
+  if (!deviceId) return;
+  const key = `slide.browser-thresholds.v1:${deviceId}`;
+  if (key === thresholdStorageKey) return;
+  thresholdStorageKey = key;
+  let config = DEFAULT_THRESHOLDS;
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) config = validateThresholds(JSON.parse(saved));
+    $('#threshold-feedback').textContent = 'Thresholds are saved in this browser for this station.';
+  } catch {
+    $('#threshold-feedback').textContent = 'Saved thresholds unavailable. Using editable defaults.';
+  }
+  webAlerts = new ThresholdAlerts(config);
+  populateThresholds();
+}
+
+function renderBrowserAlertState() {
+  const banner = $('#threshold-banner');
+  const active = [...webAlerts.active.values()];
+  const missing = Object.keys(webAlerts.values).filter((key) => webAlerts.config[key].enabled && webAlerts.values[key] === null);
+  banner.dataset.state = active.some((record) => record.event.severity === 'CRITICAL') ? 'offline' : active.length || missing.length ? 'stale' : 'current';
+  banner.textContent = active.length ? active.map((record) => `${record.event.severity} · ${record.event.sensor}: ${record.event.value}${record.event.sensor === 'MPU_ANGLE' ? '°' : ' ADC'}${record.event.stale ? ' · STALE: current condition unknown' : ''}`).join(' | ') :
+    missing.length ? `Browser alerts paused for unavailable readings: ${missing.join(', ')}.` : 'Automatic browser alerts active. No thresholds currently exceeded.';
+  if (active.length && missing.length) banner.textContent += ` | Awaiting fresh readings: ${missing.join(', ')}.`;
+  renderAlerts();
+}
+
+function saveBrowserThresholds() {
+  const field = (id) => $(`#${id}`).value.trim() === '' ? NaN : Number($(`#${id}`).value);
+  try {
+    if (!thresholdStorageKey) throw new Error('Wait for the station identity before saving thresholds.');
+    const config = validateThresholds({
+      mpu: { enabled: $('#mpu-enabled').checked, caution: field('caution'), warning: field('warning'), critical: field('critical') },
+      ...Object.fromEntries(['soil', 'rain'].map((sensor) => [sensor, {
+        enabled: $(`#${sensor}-enabled`).checked, threshold: field(`${sensor}-threshold`), direction: $(`#${sensor}-direction`).value,
+      }])),
     });
-  }
-  const sensor = Number($('#adc-sensor').value);
-  const isSoil = sensor === 0;
-  const endpoint = isSoil ? calibration?.soil : calibration?.rain;
-  const wetness = isSoil ? snapshot?.readings?.soil_wetness_pct : snapshot?.readings?.rain_wetness_pct;
-  const threshold = settings?.adc_threshold?.[sensor];
-  $('#adc-calibration').textContent = endpoint
-    ? `${endpoint.valid ? 'Calibrated' : 'Dry/wet endpoints required'} · dry ${endpoint.dry} · wet ${endpoint.wet} · current ${wetness == null ? 'unavailable' : `${Number(wetness).toFixed(1)}% wetness`}`
-    : 'Station calibration data is unavailable.';
-  if (settings) {
-    $('#adc-threshold').value = threshold ?? 80;
-    $('#adc-seconds').value = settings.adc_duration_s?.[sensor] ?? 10;
-    $('#adc-enabled').checked = settings.adc_enabled?.[sensor] === true;
-  }
-}
-
-function renderCommands(commands) {
-  const holder = $('#command-list'); holder.replaceChildren();
-  if (!commands?.length) { holder.textContent = 'No maintenance commands recorded.'; return; }
-  for (const command of commands) {
-    const row = document.createElement('p');
-    row.textContent = `${command.kind.replaceAll('_', ' ')} · ${command.state} · created ${formatTime(command.created_at)}${command.result_message ? ` · ${command.result_message}` : ''}`;
-    holder.append(row);
-  }
-}
-
-async function refreshSettings() {
-  const [result] = await Promise.all([getJson('/commands?limit=25')]);
-  renderCommands(result.commands);
+    webAlerts.configure(config);
+    let saved = true;
+    try { localStorage.setItem(thresholdStorageKey, JSON.stringify(config)); } catch { saved = false; }
+    $('#threshold-feedback').textContent = saved ? 'Alert thresholds saved in this browser.' : 'Thresholds active for this tab; browser storage is unavailable.';
+    const notices = webAlerts.update(dashboardSnapshot);
+    for (const record of notices) toast(`${record.event.severity} · ${record.event.sensor}`, 'Current reading exceeds the updated threshold.', 'watch');
+    renderBrowserAlertState();
+  } catch (error) { $('#threshold-feedback').textContent = error.message; }
 }
 
 async function refresh() {
@@ -470,14 +495,14 @@ async function refresh() {
   try {
     const snapshot = await getJson('/dashboard');
     renderOverview(snapshot);
-    const [history, alerts] = await Promise.all([
-      getJson(readingsRangeUrl(activeRange)), getJson('/alerts?limit=100'),
+    // Secondary history failures must not stop alerts from fresh live telemetry.
+    await Promise.allSettled([
+      getJson(readingsRangeUrl(activeRange)).then((history) => { renderChart(history.readings); renderHistory(history.readings); })
+        .catch(() => { $('#history-status').textContent = 'Stored reading history is temporarily unavailable.'; }),
+      refreshAlerts().catch(() => { /* Browser alerts remain available independently of device event history. */ }),
     ]);
-    renderChart(history.readings);
-    renderHistory(history.readings);
-    renderAlerts(alerts.alerts);
-    if (location.hash === '#settings') await refreshSettings();
   } catch (error) {
+    webAlerts.markStale(); renderBrowserAlertState();
     $('#live-banner').dataset.state = 'offline';
     $('#live-banner').textContent = `Station service unavailable: ${error.message}`;
     $('#mobileStatus').dataset.state = 'offline';
@@ -490,32 +515,16 @@ async function refresh() {
   }
 }
 
-async function queueCommand(kind, fields = {}) {
-  const feedback = $('#command-feedback');
-  feedback.dataset.state = 'loading';
-  feedback.textContent = 'Sending a time-limited command to the station…';
-  try {
-    const result = await postJson('/commands', { kind, ...fields });
-    feedback.dataset.state = 'current';
-    feedback.textContent = `Command queued. It expires in ${result.expires_in} seconds and applies only to this station session.`;
-    toast('Command queued', 'The station will report when it has applied the change.');
-    await refreshSettings();
-  } catch (error) {
-    feedback.dataset.state = 'offline';
-    feedback.textContent = `Command not queued: ${error.message}`;
-  }
-}
-
 function bindControls() {
   $('#menuButton').onclick = () => { sidebar.classList.add('open'); scrim.classList.add('show'); document.body.style.overflow = 'hidden'; };
   $('#collapseButton').onclick = () => {
     document.documentElement.classList.toggle('collapsed');
-    localStorage.setItem('slide-collapse', document.documentElement.classList.contains('collapsed'));
+    try { localStorage.setItem('slide-collapse', document.documentElement.classList.contains('collapsed')); } catch { /* Sidebar preference is optional. */ }
   };
-  document.documentElement.classList.toggle('collapsed', localStorage.getItem('slide-collapse') === 'true');
+  try { document.documentElement.classList.toggle('collapsed', localStorage.getItem('slide-collapse') === 'true'); } catch { /* Browser storage may be disabled. */ }
   scrim.onclick = closeMenu;
   $$('[data-view]').forEach((element) => element.addEventListener('click', (event) => {
-    event.preventDefault(); page(element.dataset.view); if (element.dataset.view === 'settings') refreshSettings();
+    event.preventDefault(); page(element.dataset.view);
   }));
   addEventListener('hashchange', () => page(location.hash.slice(1), false));
   page(location.hash.slice(1) || 'overview', false);
@@ -528,33 +537,7 @@ function bindControls() {
     activeRange = button.dataset.range; $('#historyRange').value = activeRange; refresh();
   }));
   $('#historyRange').onchange = (event) => { activeRange = event.target.value; refresh(); };
-  $('#adc-sensor').onchange = () => renderMaintenance(dashboardSnapshot?.latest);
-  $('#calibrate-mpu').onclick = () => {
-    if (confirm('Leave the MPU firmly mounted and completely stationary for about 10 seconds. Start baseline calibration?'))
-      queueCommand('calibrate_mpu');
-  };
-  $('#testModeToggle').onchange = (event) => {
-    if (event.target.checked && !dashboardSnapshot?.latest?.health?.baseline_calibrated) {
-      event.target.checked = false;
-      $('#command-feedback').textContent = 'Calibrate a stable MPU baseline before enabling TEST MODE.';
-      return;
-    }
-    const enabled = event.target.checked;
-    if (enabled && !confirm('Enable experimental tilt events for this boot? TEST MODE will turn off after an ESP32 restart.')) {
-      event.target.checked = false; return;
-    }
-    queueCommand('set_test_mode', { enabled });
-  };
-  $('#save-tilt').onclick = () => queueCommand('set_tilt_thresholds', {
-    caution: Number($('#caution').value), warning: Number($('#warning').value), critical: Number($('#critical').value),
-    caution_s: Number($('#caution-s').value), warning_s: Number($('#warning-s').value), critical_s: Number($('#critical-s').value),
-  });
-  $('#record-dry').onclick = () => queueCommand('record_adc_endpoint', { sensor: Number($('#adc-sensor').value), wet: false });
-  $('#record-wet').onclick = () => queueCommand('record_adc_endpoint', { sensor: Number($('#adc-sensor').value), wet: true });
-  $('#save-adc').onclick = () => queueCommand('set_adc_settings', {
-    sensor: Number($('#adc-sensor').value), threshold: Number($('#adc-threshold').value),
-    seconds: Number($('#adc-seconds').value), enabled: $('#adc-enabled').checked,
-  });
+  $('#save-thresholds').onclick = saveBrowserThresholds;
   $('#exportCsv').onclick = async (event) => {
     event.preventDefault();
     try {
@@ -565,12 +548,22 @@ function bindControls() {
     } catch (error) { toast('Export unavailable', error.message, 'watch'); }
   };
   addEventListener('online', () => { if (dashboardSnapshot) updateNetworkState(dashboardSnapshot); refresh(); });
-  addEventListener('offline', () => { if (dashboardSnapshot) updateNetworkState(dashboardSnapshot); });
+  addEventListener('offline', () => { webAlerts.markStale(); renderBrowserAlertState(); if (dashboardSnapshot) updateNetworkState(dashboardSnapshot); });
+  addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 }
 
+populateThresholds();
+renderBrowserAlertState();
 bindControls();
 if ('serviceWorker' in navigator) addEventListener('load', () => {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 });
 refresh();
 setInterval(() => { if (!document.hidden) refresh(); }, 2500);
+
+setInterval(() => {
+  if (navigator.onLine === false || !telemetryFresh(dashboardSnapshot)) {
+    webAlerts.markStale(); renderBrowserAlertState();
+    if (dashboardSnapshot) updateNetworkState(dashboardSnapshot);
+  }
+}, 1000);
