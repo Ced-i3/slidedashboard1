@@ -516,13 +516,17 @@ async function refresh() {
 }
 
 function bindControls() {
-  $('#menuButton').onclick = () => { sidebar.classList.add('open'); scrim.classList.add('show'); document.body.style.overflow = 'hidden'; };
-  $('#collapseButton').onclick = () => {
-    document.documentElement.classList.toggle('collapsed');
-    try { localStorage.setItem('slide-collapse', document.documentElement.classList.contains('collapsed')); } catch { /* Sidebar preference is optional. */ }
-  };
-  try { document.documentElement.classList.toggle('collapsed', localStorage.getItem('slide-collapse') === 'true'); } catch { /* Browser storage may be disabled. */ }
-  scrim.onclick = closeMenu;
+  const menuButton = $('#menuButton');
+  if (menuButton) menuButton.onclick = () => { sidebar.classList.add('open'); scrim.classList.add('show'); document.body.style.overflow = 'hidden'; };
+  const collapseButton = $('#collapseButton');
+  if (collapseButton) {
+    collapseButton.onclick = () => {
+      document.documentElement.classList.toggle('collapsed');
+      try { localStorage.setItem('slide-collapse', document.documentElement.classList.contains('collapsed')); } catch { /* Sidebar preference is optional. */ }
+    };
+    try { document.documentElement.classList.toggle('collapsed', localStorage.getItem('slide-collapse') === 'true'); } catch { /* Sidebar preference is optional. */ }
+  }
+  if (scrim) scrim.onclick = closeMenu;
   $$('[data-view]').forEach((element) => element.addEventListener('click', (event) => {
     event.preventDefault(); page(element.dataset.view);
   }));
