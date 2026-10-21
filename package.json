@@ -1,0 +1,14 @@
+{
+  "name": "slide-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "S.L.I.D.E. hosted dashboard and device API for the team-owned server",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server/app.mjs",
+    "check": "node --check server/app.mjs && node --check dist/app.js && node --check dist/sw.js"
+  }
+}

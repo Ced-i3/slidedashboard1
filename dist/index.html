@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#064b37">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>S.L.I.D.E. Monitoring Dashboard</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <a class="brand" href="#overview" data-view="overview">
+      <img src="assets/slide-logo.png" alt="">
+      <span><strong>S.L.I.D.E.</strong><small>Field monitor</small></span>
+    </a>
+    <button id="collapseButton" aria-label="Collapse navigation">‹</button>
+    <nav aria-label="Main navigation">
+      <a href="#overview" data-view="overview" aria-current="page"><i>▦</i><span>Overview</span></a>
+      <button id="alertsButton" type="button"><i>♧</i><span>Alerts</span><b id="alertCount" hidden></b></button>
+      <a href="#history" data-view="history"><i>↶</i><span>History</span></a>
+      <a href="#sites" data-view="sites"><i>⌖</i><span>Monitoring site</span></a>
+    </nav>
+    <div class="mountains" aria-hidden="true"></div>
+    <a class="settings" href="#settings" data-view="settings"><i>⚙</i><span>Station settings</span></a>
+  </aside>
+  <button id="scrim" aria-label="Close menu"></button>
+
+  <main>
+    <div class="mobile">
+      <button id="menuButton" type="button" aria-label="Open menu">☰</button>
+      <img src="assets/slide-logo.png" alt="">
+      <strong>S.L.I.D.E.</strong>
+      <span id="mobileStatus" class="status-chip" data-state="loading">Loading</span>
+    </div>
+
+    <section class="view" data-page="overview">
+      <header>
+        <div>
+          <p id="station-location" class="location">Monitoring station</p>
+          <h1>Station overview</h1>
+          <p class="subtitle">Observed conditions and device health</p>
+        </div>
+        <div class="updated">
+          <span aria-hidden="true">◷</span>
+          <span><small>Last received</small><strong id="last-updated">Waiting for first upload</strong><small id="last-observed">Observation time unavailable</small></span>
+        </div>
+      </header>
+      <div id="live-banner" class="live-banner" data-state="loading" role="status" aria-live="polite">Connecting to the station service…</div>
+
+      <div class="sensors">
+        <article class="sensor-card">
+          <div class="title"><i class="moist" aria-hidden="true">◒</i><strong>Soil wetness</strong><em id="soil-state">Waiting</em></div>
+          <div id="soil-reading" class="reading">—<small>unavailable</small></div>
+          <div class="sensor-detail" id="soil-detail">Waiting for a device reading.</div>
+        </article>
+        <article class="sensor-card">
+          <div class="title"><i class="tilt" aria-hidden="true">◿</i><strong>Relative tilt</strong><em id="tilt-state">Waiting</em></div>
+          <div id="tilt-reading" class="reading">—<small>unavailable</small></div>
+          <div class="sensor-detail" id="tilt-detail">A valid, calibrated baseline is required.</div>
+        </article>
+        <article class="sensor-card">
+          <div class="title"><i class="rain" aria-hidden="true">☁</i><strong>Rain-plate wetness</strong><em id="rain-state">Waiting</em></div>
+          <div id="rain-reading" class="reading">—<small>unavailable</small></div>
+          <div class="sensor-detail" id="rain-detail">Plate wetness is not rainfall intensity.</div>
+        </article>
+        <article class="sensor-card">
+          <div class="title"><i class="temp" aria-hidden="true">♨</i><strong>Air temperature</strong><em id="air-state">Waiting</em></div>
+          <div id="air-reading" class="reading">—<small>unavailable</small></div>
+          <div class="sensor-detail" id="air-detail">Humidity unavailable.</div>
+        </article>
+      </div>
+
+      <section class="panel chart-panel delivery-panel" aria-labelledby="delivery-heading">
+        <div class="panel-head"><div><h2 id="delivery-heading">Upload delivery</h2><p class="chart-note">Device-side event queue counters from the latest received snapshot.</p></div></div>
+        <dl>
+          <div><dt>Queued event revisions</dt><dd id="delivery-queue">Waiting for telemetry</dd></div>
+          <div><dt>Events discarded on queue overflow</dt><dd id="delivery-dropped">Waiting for telemetry</dd></div>
+          <div><dt>Event upload retries this boot</dt><dd id="delivery-retries">Waiting for telemetry</dd></div>
+          <div><dt>Last accepted upload (device uptime)</dt><dd id="delivery-last-success">Waiting for telemetry</dd></div>
+        </dl>
+        <p id="delivery-observed-at" class="chart-note">Delivery counters are not yet available.</p>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <div><h2>Recorded conditions</h2><p class="chart-note">Each trace uses its own unit and scale. Missing samples remain gaps.</p></div>
+          <div class="periods" role="group" aria-label="Chart period">
+            <button type="button" data-range="24h" class="active" aria-pressed="true">24 hours</button>
+            <button type="button" data-range="7d" aria-pressed="false">7 days</button>
+            <button type="button" data-range="30d" aria-pressed="false">30 days</button>
+          </div>
+        </div>
+        <div class="trend-grid">
+          <article><h3>Soil wetness (%)</h3><svg id="soil-chart" viewBox="0 0 300 90" role="img" aria-label="Soil wetness history"></svg><p id="soil-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><h3>Relative tilt (degrees)</h3><svg id="tilt-chart" viewBox="0 0 300 90" role="img" aria-label="Relative tilt history"></svg><p id="tilt-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><h3>Air temperature (°C)</h3><svg id="air-chart" viewBox="0 0 300 90" role="img" aria-label="Air temperature history"></svg><p id="air-chart-range" class="chart-note">Waiting for history.</p></article>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" data-page="history" hidden>
+      <header>
+        <div><p class="eyebrow">Stored station readings</p><h1>Reading history</h1><p class="subtitle">Values use the device’s available calibration and sensor units.</p></div>
+        <a class="secondary" href="/api/v1/readings.csv" id="exportCsv">Export CSV</a>
+      </header>
+      <section class="panel section">
+        <div class="filters"><label>Period<select id="historyRange"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label></div>
+        <p id="history-status" class="chart-note" role="status">Waiting for the station service.</p>
+        <div class="table"><table><thead><tr><th>Received</th><th>Observed</th><th>Soil ADC / wetness</th><th>Rain ADC / plate wetness</th><th>Relative tilt</th><th>Temperature</th><th>Device health</th></tr></thead><tbody id="history-rows"><tr><td colspan="7">No readings have arrived.</td></tr></tbody></table></div>
+      </section>
+    </section>
+
+    <section class="view" data-page="sites" hidden>
+      <header><div><p class="eyebrow">Station location and health</p><h1>Monitoring site</h1><p class="subtitle">Coordinates locate the monitoring station.</p></div></header>
+      <div class="two-col">
+        <section class="panel map" aria-label="Station location">
+          <div id="map-empty" class="map-empty">Station coordinates are not available yet.</div>
+          <a id="map-marker" class="map-marker" hidden target="_blank" rel="noopener noreferrer" aria-label="Open station coordinates in maps">⌖</a>
+        </section>
+        <section class="panel station">
+          <span id="site-status" class="status-chip" data-state="loading">Waiting</span>
+          <p class="eyebrow">Device</p><h2 id="site-device-id">Waiting for device</h2>
+          <p id="site-coordinates">Coordinates unavailable.</p>
+          <dl>
+            <div><dt>Last device contact</dt><dd id="site-last-seen">No contact recorded</dd></div>
+            <div><dt>GPS fix</dt><dd id="site-gps-status">Unavailable</dd></div>
+            <div><dt>Satellites</dt><dd id="site-satellites">Unavailable</dd></div>
+            <div><dt>MPU baseline</dt><dd id="site-baseline">Unavailable</dd></div>
+            <div><dt>Experimental TEST MODE</dt><dd id="site-test-mode">Off or unavailable</dd></div>
+          </dl>
+        </section>
+      </div>
+    </section>
+
+    <section class="view" data-page="settings" hidden>
+      <header><div><p class="eyebrow">Authenticated station controls</p><h1>Station settings</h1><p class="subtitle">Commands require an online station and expire if it disconnects.</p></div><button class="secondary" id="logoutButton" type="button">Sign out</button></header>
+      <p id="command-feedback" class="live-banner" role="status">Control status loads from the station.</p>
+      <div class="two-col settings-grid">
+        <section class="panel form">
+          <h2>Baseline and experimental mode</h2>
+          <p>Calibrate with the MPU stationary and firmly mounted. TEST MODE is disabled whenever the ESP32 restarts.</p>
+          <div id="calibration-detail" class="meta">Calibration state unavailable.</div>
+          <button class="primary" id="calibrate-mpu" type="button">Calibrate MPU baseline</button>
+          <label class="test-mode-row">Enable experimental TEST MODE <input id="testModeToggle" type="checkbox"></label>
+          <h3>Experimental tilt criteria</h3>
+          <div class="mini-grid">
+            <label>CAUTION (°)<input id="caution" type="number" min="3" max="89" step="1" value="3"></label>
+            <label>WARNING (°)<input id="warning" type="number" min="4" max="90" step="1" value="5"></label>
+            <label>CRITICAL (°)<input id="critical" type="number" min="5" max="90" step="1" value="10"></label>
+            <label>CAUTION (s)<input id="caution-s" type="number" min="1" max="3600" value="10"></label>
+            <label>WARNING (s)<input id="warning-s" type="number" min="1" max="3600" value="5"></label>
+            <label>CRITICAL (s)<input id="critical-s" type="number" min="1" max="3600" value="5"></label>
+          </div>
+          <button class="secondary" id="save-tilt" type="button">Save tilt criteria</button>
+          <p class="meta">These are experimental demonstration settings, not validated landslide predictions.</p>
+        </section>
+        <section class="panel form">
+          <h2>Soil and rain-plate calibration</h2>
+          <p>Record observed dry and wet raw endpoints separately for each sensor. Values remain relative wetness.</p>
+          <label>Sensor<select id="adc-sensor"><option value="0">Soil</option><option value="1">Rain plate</option></select></label>
+          <div id="adc-calibration" class="meta">Calibration state unavailable.</div>
+          <div class="button-row"><button class="secondary" id="record-dry" type="button">Record dry endpoint</button><button class="secondary" id="record-wet" type="button">Record wet endpoint</button></div>
+          <label>Wetness threshold (%)<input id="adc-threshold" type="number" min="1" max="100" step="1" value="80"></label>
+          <label>Duration (seconds)<input id="adc-seconds" type="number" min="1" max="3600" value="10"></label>
+          <label class="test-mode-row">Enable this experimental ADC event <input id="adc-enabled" type="checkbox"></label>
+          <button class="secondary" id="save-adc" type="button">Save wetness rule</button>
+          <p class="meta">The rain plate does not measure rainfall in millimetres or millimetres per hour.</p>
+        </section>
+      </div>
+      <section class="panel section command-panel"><h2>Recent maintenance commands</h2><p class="chart-note">A queued action is not complete until the station returns its result.</p><div id="command-list">No commands loaded.</div></section>
+    </section>
+
+    <footer><span>S.L.I.D.E. reports experimental sensor conditions; it does not predict landslides.</span><span><i id="netDot" class="off"></i><span id="netStatus">Station data unavailable</span></span></footer>
+  </main>
+
+  <div class="modal-shell" id="modal" hidden>
+    <button class="backdrop" data-close aria-label="Close alerts"></button>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="alerts-heading">
+      <div class="modal-head"><div><p class="eyebrow">Station event history</p><h2 id="alerts-heading">Alerts</h2></div><button data-close aria-label="Close alerts">×</button></div>
+      <p class="modal-note">These events describe experimental sensor conditions. Acknowledgment does not clear an active condition.</p>
+      <div id="alert-list" class="alerts" aria-live="polite">Waiting for events.</div>
+    </section>
+  </div>
+
+  <section class="auth-gate" id="authGate" hidden aria-labelledby="login-title">
+    <form id="loginForm" class="panel auth-card">
+      <img src="assets/slide-logo.png" alt="">
+      <p class="eyebrow">S.L.I.D.E. station service</p>
+      <h1 id="login-title">Sign in to monitor</h1>
+      <p>Use the dashboard password configured by your station administrator.</p>
+      <label for="loginPassword">Dashboard password</label>
+      <input id="loginPassword" type="password" autocomplete="current-password" minlength="1" required>
+      <button class="primary" type="submit">Sign in</button>
+      <p id="loginError" class="login-error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
