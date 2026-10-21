@@ -1,6 +1,6 @@
 # S.L.I.D.E. API contract
 
-Base URL: `https://slide.akios.site/api/v1`. The firmware setup form currently accepts this host and base path only. TLS certificate and hostname validation remain enabled in the ESP32 HTTP client.
+Base URL: `https://slide.akios.site/api/v1`. The firmware setup form currently accepts this host and base path only. TLS certificate and hostname validation remain enabled in the ESP32 HTTP client. Vercel serves the dashboard and Node.js API Function; the primary API persists data in Postgres through the Vercel Marketplace integration.
 
 Device requests send `Authorization: Bearer <SLIDE_DEVICE_TOKEN>` and `X-SLIDE-Device: <SLIDE_DEVICE_ID>`. Dashboard sign-in uses the operator password over HTTPS and receives a short-lived bearer session token. All user API routes require that token. Responses use `Cache-Control: no-store`.
 
@@ -35,12 +35,19 @@ Device authentication or validation failures receive `401` or `400`; oversized J
 
 Maintenance command kinds are `calibrate_mpu`, `set_test_mode`, `record_adc_endpoint`, `set_tilt_thresholds`, and `set_adc_settings`. Commands target the latest boot, expire after 120 seconds, and are accepted sequentially. Acknowledgment is server-side and does not change the firmware's active/resolved event state.
 
-## Orange Pi integration
+## Vercel primary deployment
 
-1. Install Node.js 22.13 or later and place this service alongside the existing website runtime after reviewing that host's current service and database.
-2. Put the site behind the existing HTTPS reverse proxy and forward `/` and `/api/v1/` to the same Node process. Keep Node bound to loopback unless the host's service design requires another private interface.
-3. Create a private environment file from `.env.example`. Use a unique dashboard password and a cryptographically random device token of at least 32 bytes. Set the firmware's local ignored `slide_local_secret.h` to the matching device ID/token and a unique 8–16 character setup password.
-4. Keep `SLIDE_DATA_DIR` on persistent storage. Back up the SQLite database and verify restore before connecting field hardware.
-5. Confirm the public domain, TLS certificate chain, proxy routing, startup/restart policy, firewall, and backup schedule on the Orange Pi. No production service or proxy configuration is included in this source change.
+1. Import `Ced-i3/slidedashboard1` with the repository root as the Root Directory. The dashboard source is at the repository root; `vercel.json` runs its build script to create `dist`, while `api/v1/[...path].mjs` handles API routes. Build and output settings come from the repository, but Root Directory remains a Vercel project setting.
+2. Connect a Postgres storage integration from the Vercel Marketplace, such as Neon. Set its pooled connection string as `DATABASE_URL` in the Vercel project.
+3. Set `SLIDE_DEVICE_ID`, `SLIDE_DEVICE_TOKEN`, and `SLIDE_DASHBOARD_PASSWORD` as server-only Vercel environment variables. The device token must match the private firmware configuration; never expose it in frontend code.
+4. Attach `slide.akios.site` to the production deployment and redeploy. On its first successful API request, the function creates the required tables if they do not exist. It returns `503 api_not_configured` when required database or credential settings are absent.
 
-The source defines a 15-second stale-data threshold, a 60-second device-offline threshold, and 30-day reading retention. These are starting operational values. Device time synchronization, HTTPS reachability, Orange Pi deployment, and end-to-end behavior still require field verification.
+The API uses persistent Postgres tables for device state, readings, alerts, commands, login attempts, and dashboard sessions. This is required because Vercel Function filesystems are not durable application storage.
+
+## Orange Pi backup service
+
+The `server/app.mjs` service remains an independently runnable SQLite implementation for manual recovery. Run it with Node.js 22.13 or later, provide a private environment file from `.env.example`, and place `SLIDE_DATA_DIR` on persistent storage. Keep its SQLite database backed up separately.
+
+The Orange Pi SQLite database is not automatically synchronized with the Vercel Postgres database. Existing SQLite records are not migrated by this source change. A recovery cutover that needs the latest Vercel records requires a separate export/restore or replication procedure before changing DNS or the firmware endpoint.
+
+The API defines a 15-second stale-data threshold, a 60-second device-offline threshold, and 30-day reading retention. These are starting operational values. Device time synchronization, Vercel/Neon configuration, Orange Pi recovery, and end-to-end device behavior still require deployment and field verification.

@@ -2,12 +2,12 @@
 
 S.L.I.D.E. is a Progressive Web App (PWA). It can be installed from a web browser and opened from the Home Screen, Start menu, desktop, Dock, or application launcher without downloading it from an app store.
 
-Production address: **https://slide.joalvergs.tech**
+Production address: **https://slide.akios.site**
 
 ## Before installing
 
 1. Connect the device to the internet.
-2. Open **https://slide.joalvergs.tech** in a supported browser.
+2. Open **https://slide.akios.site** in a supported browser.
 3. Confirm that the S.L.I.D.E. dashboard appears.
 4. Do not continue if the browser shows a Vercel login page, certificate warning, `404 DEPLOYMENT_NOT_FOUND`, or another error. Contact the project administrator first.
 
@@ -16,7 +16,7 @@ After the first successful visit, the application shell can reopen offline. Live
 ## Android phone or tablet using Chrome
 
 1. Open **Google Chrome**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Wait for the dashboard to finish loading.
 4. Tap the **three-dot menu** beside the address bar.
 5. Select **Install app**, **Install**, or **Add to Home screen**. The wording varies by Chrome version and device manufacturer.
@@ -40,7 +40,7 @@ Official reference: [Use web apps on Android — Google Chrome Help](https://sup
 Use Safari for installation. Opening the link in an in-app browser may hide the required Home Screen option.
 
 1. Open **Safari**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Wait for the dashboard to load.
 4. Tap the **Share** button. Depending on the Safari layout, it may appear in the toolbar or under the page menu.
 5. Scroll through the actions and tap **Add to Home Screen**.
@@ -61,7 +61,7 @@ Official reference: [Turn a website into an app on iPhone — Apple Support](htt
 ## iPad using Safari
 
 1. Open **Safari** on the iPad.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Tap the **Share** button, then tap **More** if necessary.
 4. Select **Add to Home Screen**.
 5. Enable **Open as Web App** if that option appears.
@@ -75,7 +75,7 @@ Official reference: [Turn a website into an app on iPad — Apple Support](https
 ## Windows using Google Chrome
 
 1. Open **Google Chrome**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Select the **Install** icon at the right side of the address bar, if visible.
 4. If it is not visible, open the **three-dot menu**.
 5. Select **Cast, save, and share**, then **Install page as app**.
@@ -87,7 +87,7 @@ Official reference: [Use web apps on a computer — Google Chrome Help](https://
 ## Windows using Microsoft Edge
 
 1. Open **Microsoft Edge**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Select the **App available** icon at the right side of the address bar, if visible.
 4. Otherwise, open the **three-dot menu** and select **Apps**.
 5. Select **Install this site as an app**.
@@ -99,7 +99,7 @@ Installed web apps can be managed from `edge://apps`.
 ## macOS using Google Chrome
 
 1. Open **Google Chrome**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Select the **Install** icon in the address bar, if present.
 4. Otherwise, open Chrome's **three-dot menu**.
 5. Select **Cast, save, and share**, then **Install page as app**.
@@ -111,7 +111,7 @@ Installed Chrome web apps can be managed from `chrome://apps`.
 ## Chromebook
 
 1. Open **Chrome**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Select the **Install** icon in the address bar, or open the three-dot menu.
 4. Select **Install page as app** and confirm.
 5. Open S.L.I.D.E. from the Chromebook Launcher.
@@ -121,7 +121,7 @@ To remove it, right-click the app in the Launcher and select **Uninstall**.
 ## Linux using Chrome or Chromium
 
 1. Open **Chrome** or **Chromium**.
-2. Visit **https://slide.joalvergs.tech**.
+2. Visit **https://slide.akios.site**.
 3. Select the Install icon in the address bar, or open the browser menu.
 4. Select **Install page as app**.
 5. Confirm installation.
@@ -134,7 +134,7 @@ Browser packaging and desktop integration may differ across Linux distributions.
 The PWA checks for updates when it is opened with an internet connection. To force a refresh:
 
 1. Close every open S.L.I.D.E. app window.
-2. Reopen **https://slide.joalvergs.tech** in the browser.
+2. Reopen **https://slide.akios.site** in the browser.
 3. Reload the page.
 4. Close and reopen the installed application.
 
@@ -146,9 +146,9 @@ If an old version remains, clear the site's cached data or uninstall and reinsta
 
 The production deployment is protected. A project administrator must change Vercel Deployment Protection to **Standard Protection** or **None** before the public can install the app.
 
-### `404 DEPLOYMENT_NOT_FOUND` appears
+### A Vercel `404 NOT_FOUND` appears
 
-The domain reaches Vercel but is not assigned to a current deployment. The administrator must attach `slide.joalvergs.tech` to the active production deployment.
+Redeploy the latest repository commit; `vercel.json` runs the build and selects the generated `dist` output automatically. If the 404 remains, confirm the Vercel project's Root Directory points to this repository's root, since that setting is managed separately in Vercel, then confirm `slide.akios.site` is attached to the active production deployment.
 
 ### The browser shows a certificate or privacy warning
 

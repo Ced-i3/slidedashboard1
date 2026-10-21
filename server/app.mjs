@@ -6,7 +6,6 @@ import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const DIST = resolve(ROOT, 'dist');
 const DATA = resolve(ROOT, process.env.SLIDE_DATA_DIR || 'data');
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 8080);
@@ -26,6 +25,7 @@ const MIME = new Map([
   ['.css', 'text/css; charset=utf-8'], ['.webmanifest', 'application/manifest+json'],
   ['.png', 'image/png'], ['.svg', 'image/svg+xml'], ['.ico', 'image/x-icon'],
 ]);
+const STATIC_FILES = new Set(['/index.html', '/app.js', '/styles.css', '/manifest.webmanifest', '/sw.js']);
 
 function fatal(message) {
   process.stderr.write(`S.L.I.D.E. startup error: ${message}\n`);
@@ -105,6 +105,7 @@ db.prepare('INSERT INTO devices(id) VALUES (?) ON CONFLICT(id) DO NOTHING').run(
 
 const getDevice = db.prepare('SELECT * FROM devices WHERE id = ?');
 const updateDevice = db.prepare(`UPDATE devices SET last_seen_at = ?, last_boot_id = ?, last_sequence = ? WHERE id = ?`);
+const updateDeviceContact = db.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?');
 const findReading = db.prepare(`SELECT id FROM readings WHERE device_id = ? AND boot_id = ? AND sequence = ?`);
 const insertReading = db.prepare(`INSERT OR IGNORE INTO readings
   (device_id,boot_id,sequence,received_at,observed_at,observed_uptime_ms,payload_json)
@@ -335,6 +336,9 @@ function dashboardState() {
   const lastSeenMs = device.last_seen_at ? Date.parse(device.last_seen_at) : 0;
   const receivedMs = row ? Date.parse(row.received_at) : 0;
   const now = Date.now();
+  const observationMs = row?.observed_at ? Date.parse(row.observed_at) : NaN;
+  const observationAgeS = Number.isFinite(observationMs)
+    ? Math.max(0, Math.floor((now - observationMs) / 1000)) : null;
   let latest = null;
   if (row) {
     latest = JSON.parse(row.payload_json);
@@ -351,7 +355,9 @@ function dashboardState() {
       connectivity_age_s: lastSeenMs > 0 ? Math.max(0, Math.floor((now - lastSeenMs) / 1000)) : null,
     },
     latest,
-    telemetry_stale: receivedMs === 0 || now - receivedMs > TELEMETRY_STALE_MS,
+    observation_age_s: observationAgeS,
+    telemetry_stale: receivedMs === 0 || now - receivedMs > TELEMETRY_STALE_MS ||
+      (observationAgeS !== null && observationAgeS * 1000 > TELEMETRY_STALE_MS),
   };
 }
 
@@ -396,7 +402,7 @@ const selectCommands = db.prepare(`SELECT id,kind,payload_json,expires_at FROM c
   ORDER BY created_at LIMIT 4`);
 const markDelivered = db.prepare(`UPDATE commands SET state='delivered', delivered_at=?, attempts=attempts+1
   WHERE id=? AND state IN ('queued','delivered')`);
-const commandForResult = db.prepare('SELECT state,target_boot_id FROM commands WHERE id=? AND device_id=?');
+const commandForResult = db.prepare('SELECT state,target_boot_id,expires_at,result_message FROM commands WHERE id=? AND device_id=?');
 const updateCommandResult = db.prepare(`UPDATE commands SET state=?,completed_at=?,result_message=?
   WHERE id=? AND device_id=? AND state IN ('queued','delivered')`);
 
@@ -414,19 +420,29 @@ function transaction(callback) {
 
 function commandPayload(body) {
   if (typeof body.kind !== 'string') return null;
-  if (body.kind === 'calibrate_mpu') return { path: '/api/calibrate/mpu', body: {} };
-  if (body.kind === 'set_test_mode' && typeof body.enabled === 'boolean')
+  const exactKeys = (...keys) => keys.length === Object.keys(body).length &&
+    keys.every((key) => Object.hasOwn(body, key));
+  if (body.kind === 'calibrate_mpu' && exactKeys('kind')) return { path: '/api/calibrate/mpu', body: {} };
+  if (body.kind === 'set_test_mode' && exactKeys('kind', 'enabled') && typeof body.enabled === 'boolean')
     return { path: '/api/test-mode', body: { enabled: body.enabled ? 1 : 0 } };
-  if (body.kind === 'record_adc_endpoint' && Number.isInteger(body.sensor) &&
+  if (body.kind === 'record_adc_endpoint' && exactKeys('kind', 'sensor', 'wet') && Number.isInteger(body.sensor) &&
       (body.sensor === 0 || body.sensor === 1) && typeof body.wet === 'boolean')
     return { path: '/api/calibrate/adc', body: { sensor: body.sensor, wet: body.wet ? 1 : 0 } };
-  if (body.kind === 'set_tilt_thresholds' &&
-      ['caution','warning','critical','caution_s','warning_s','critical_s'].every((key) => Number.isFinite(body[key])))
+  if (body.kind === 'set_tilt_thresholds' && exactKeys('kind', 'caution', 'warning', 'critical', 'caution_s', 'warning_s', 'critical_s') &&
+      ['caution','warning','critical','caution_s','warning_s','critical_s'].every((key) => Number.isSafeInteger(body[key])) &&
+      body.caution >= 3 && body.caution <= 89 && body.warning >= 4 && body.warning <= 90 &&
+      body.critical >= 5 && body.critical <= 90 && body.caution < body.warning && body.warning < body.critical &&
+      body.caution_s >= 1 && body.caution_s <= 3600 &&
+      body.warning_s >= 1 && body.warning_s <= 3600 &&
+      body.critical_s >= 1 && body.critical_s <= 3600)
     return { path: '/api/settings/tilt', body: Object.fromEntries(
       ['caution','warning','critical','caution_s','warning_s','critical_s'].map((key) => [key, body[key]])
     ) };
-  if (body.kind === 'set_adc_settings' && (body.sensor === 0 || body.sensor === 1) &&
-      Number.isFinite(body.threshold) && Number.isInteger(body.seconds) && typeof body.enabled === 'boolean')
+  if (body.kind === 'set_adc_settings' && exactKeys('kind', 'sensor', 'threshold', 'seconds', 'enabled') &&
+      Number.isInteger(body.sensor) && (body.sensor === 0 || body.sensor === 1) &&
+      Number.isSafeInteger(body.threshold) && body.threshold >= 1 && body.threshold <= 100 &&
+      Number.isSafeInteger(body.seconds) && body.seconds >= 1 && body.seconds <= 3600 &&
+      typeof body.enabled === 'boolean')
     return { path: '/api/settings/adc', body: { sensor: body.sensor, threshold: body.threshold,
       seconds: body.seconds, enabled: body.enabled ? 1 : 0 } };
   return null;
@@ -459,24 +475,27 @@ async function handleApi(request, response, url) {
     if (!body) return;
     const error = validateTelemetry(body);
     if (error) { invalidResponse(response, error); return; }
-    const existingDevice = getDevice.get(DEVICE_ID);
-    if (existingDevice.last_boot_id === body.boot_id && existingDevice.last_sequence !== null &&
-        body.sequence < existingDevice.last_sequence) {
-      json(response, 409, { error: 'sequence_out_of_order' });
-      return;
-    }
     const receivedAt = new Date().toISOString();
-    const received = transaction(() => {
+    const result = transaction(() => {
       const existing = findReading.get(DEVICE_ID, body.boot_id, body.sequence);
-      if (!existing) insertReading.run(DEVICE_ID, body.boot_id, body.sequence, receivedAt,
+      const existingDevice = getDevice.get(DEVICE_ID);
+      if (existing) {
+        if (existingDevice.last_boot_id === body.boot_id) updateDeviceContact.run(receivedAt, DEVICE_ID);
+        return { duplicate: true, outOfOrder: false };
+      }
+      if (existingDevice.last_boot_id === body.boot_id && existingDevice.last_sequence !== null &&
+          body.sequence < existingDevice.last_sequence)
+        return { duplicate: false, outOfOrder: true };
+      insertReading.run(DEVICE_ID, body.boot_id, body.sequence, receivedAt,
         validTime(body.observed_at), body.observed_uptime_ms, JSON.stringify(body));
       const updatedSequence = existingDevice.last_boot_id === body.boot_id
         ? Math.max(existingDevice.last_sequence || 0, body.sequence) : body.sequence;
       updateDevice.run(receivedAt, body.boot_id, updatedSequence, DEVICE_ID);
       purgeOldReadings.run(DEVICE_ID, new Date(Date.now() - RETENTION_MS).toISOString());
-      return Boolean(existing);
+      return { duplicate: false, outOfOrder: false };
     });
-    json(response, 202, { accepted: true, duplicate: received, received_at: receivedAt });
+    if (result.outOfOrder) { json(response, 409, { error: 'sequence_out_of_order' }); return; }
+    json(response, 202, { accepted: true, duplicate: result.duplicate, received_at: receivedAt });
     return;
   }
 
@@ -535,8 +554,24 @@ async function handleApi(request, response, url) {
       json(response, 404, { error: 'command_not_found_for_boot' });
       return;
     }
-    updateCommandResult.run(result, new Date().toISOString(), body.message, body.command_id, DEVICE_ID);
-    json(response, 200, { accepted: true });
+    const completedAt = new Date().toISOString();
+    if (['queued', 'delivered'].includes(command.state) && command.expires_at <= completedAt) {
+      db.prepare(`UPDATE commands SET state='expired',completed_at=?,result_message='Command expired'
+        WHERE id=? AND device_id=? AND state IN ('queued','delivered')`)
+        .run(completedAt, body.command_id, DEVICE_ID);
+      json(response, 409, { error: 'command_expired' });
+      return;
+    }
+    if (['succeeded', 'failed'].includes(command.state)) {
+      if (command.state === result && command.result_message === body.message)
+        json(response, 200, { accepted: true, duplicate: true });
+      else json(response, 409, { error: 'command_result_conflict' });
+      return;
+    }
+    if (command.state === 'expired') { json(response, 409, { error: 'command_expired' }); return; }
+    const update = updateCommandResult.run(result, completedAt, body.message, body.command_id, DEVICE_ID);
+    if (!update.changes) { json(response, 409, { error: 'command_result_conflict' }); return; }
+    json(response, 200, { accepted: true, duplicate: false });
     return;
   }
 
@@ -638,8 +673,10 @@ async function serveStatic(request, response, url) {
   try { pathname = decodeURIComponent(url.pathname); }
   catch { json(response, 400, { error: 'invalid_path' }); return; }
   if (pathname === '/') pathname = '/index.html';
-  const file = resolve(DIST, `.${pathname}`);
-  if (!file.startsWith(`${DIST}${sep}`)) { json(response, 404, { error: 'not_found' }); return; }
+  const isAsset = /^\/assets\/[A-Za-z0-9._-]+\.(?:png|svg|ico)$/i.test(pathname);
+  if (!STATIC_FILES.has(pathname) && !isAsset) { json(response, 404, { error: 'not_found' }); return; }
+  const file = resolve(ROOT, `.${pathname}`);
+  if (!file.startsWith(`${ROOT}${sep}`)) { json(response, 404, { error: 'not_found' }); return; }
   try {
     if (!(await stat(file)).isFile()) throw new Error('not a file');
     const body = await readFile(file);

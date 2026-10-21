@@ -200,7 +200,7 @@ function renderDelivery(latest) {
 function updateNetworkState(snapshot) {
   const deviceOnline = snapshot?.device?.online === true;
   const receivedAt = snapshot?.latest?.received_at;
-  const isStale = !receivedAt || Date.now() - Date.parse(receivedAt) > 15_000;
+  const isStale = snapshot?.telemetry_stale === true || !receivedAt || Date.now() - Date.parse(receivedAt) > 15_000;
   const browserOffline = navigator.onLine === false;
   let state = 'offline';
   let message = 'No telemetry has reached the server.';
@@ -215,7 +215,7 @@ function updateNetworkState(snapshot) {
     shortMessage = 'Station offline';
   } else if (isStale) {
     state = 'stale';
-    message = 'The device is reachable, but its last sensor reading is more than 15 seconds old.';
+    message = 'The device is reachable, but its last sensor observation is more than 15 seconds old.';
     shortMessage = 'Readings stale';
   } else {
     state = 'current';
