@@ -1,4 +1,4 @@
-const CACHE_NAME='slide-shell-v1.2.4';
+const CACHE_NAME='slide-shell-v1.2.5';
 const APP_SHELL=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/slide-logo.png','./assets/icon-192.png','./assets/icon-512.png','./assets/icon-maskable-512.png'];
 
 self.addEventListener('install',event=>{

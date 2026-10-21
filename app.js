@@ -108,7 +108,7 @@ function formatRelative(value) {
   return `${Math.floor(elapsed / 3600)} hours ago`;
 }
 
-function showMeasurement(element, value, unit, digits = 1) {
+function showMeasurement(element, value, unit, digits = 1, signed = false) {
   element.replaceChildren();
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     element.append('—');
@@ -117,7 +117,8 @@ function showMeasurement(element, value, unit, digits = 1) {
     element.append(small);
     return;
   }
-  element.append(Number(value.toFixed(digits)).toString());
+  const rounded = Number(value.toFixed(digits));
+  element.append(signed && rounded >= 0 ? `+${rounded}` : rounded.toString());
   const small = document.createElement('small');
   small.textContent = unit;
   element.append(small);
@@ -205,10 +206,12 @@ function renderOverview(snapshot) {
 
   if (!latest) {
     ['soil-state','tilt-state','rain-state','air-state'].forEach((id) => sensorState(id, 'Unavailable'));
-    showMeasurement($('#soil-reading'), null, '');
-    showMeasurement($('#tilt-reading'), null, '');
-    showMeasurement($('#rain-reading'), null, '');
-    showMeasurement($('#air-reading'), null, '');
+    showMeasurement($('#soil-reading'), null, 'ADC');
+    showMeasurement($('#pitch-reading'), null, '\u00b0');
+    showMeasurement($('#roll-reading'), null, '\u00b0');
+    showMeasurement($('#rain-reading'), null, 'ADC');
+    showMeasurement($('#air-temperature'), null, '\u00b0C');
+    showMeasurement($('#air-humidity'), null, '% RH');
     $('#site-coordinates').textContent = 'Coordinates unavailable.';
     $('#site-gps-status').textContent = 'Unavailable';
     $('#site-satellites').textContent = 'Unavailable';
@@ -224,31 +227,25 @@ function renderOverview(snapshot) {
   const readings = latest.readings || {};
   const health = latest.health || {};
   const gps = latest.gps || {};
-  const soilWetness = readings.soil_wetness_pct;
-  showMeasurement($('#soil-reading'), soilWetness, '%', 1);
-  sensorState('soil-state', soilWetness === null || soilWetness === undefined
-    ? (readings.soil_adc_raw === null ? 'Unavailable' : 'Uncalibrated') : (health.soil || 'Unknown'));
+  showMeasurement($('#soil-reading'), readings.soil_adc_raw, 'ADC', 0);
+  sensorState('soil-state', health.soil || 'Unknown');
   $('#soil-detail').textContent = readings.soil_adc_raw === null || readings.soil_adc_raw === undefined
-    ? 'Raw ADC reading unavailable.' : `Raw ADC ${readings.soil_adc_raw} · ${soilWetness == null ? 'wetness calibration required' : 'calibrated relative wetness'}`;
+    ? 'Raw ADC reading unavailable.' : 'Direct raw analog-to-digital sensor count.';
 
-  const tiltValid = health.mpu === 'ONLINE' && health.baseline_calibrated && typeof readings.relative_tilt_deg === 'number';
-  showMeasurement($('#tilt-reading'), tiltValid ? readings.relative_tilt_deg : null, '°', 2);
-  sensorState('tilt-state', health.mpu !== 'ONLINE' ? (health.mpu || 'Unavailable')
-    : !health.baseline_calibrated ? 'Uncalibrated' : tiltValid ? 'Calibrated' : 'Unavailable');
-  $('#tilt-detail').textContent = tiltValid ? 'Angle relative to the stored baseline.'
-    : 'Valid MPU data and a calibrated baseline are required.';
+  showMeasurement($('#pitch-reading'), readings.pitch_deg, '\u00b0', 0, true);
+  showMeasurement($('#roll-reading'), readings.roll_deg, '\u00b0', 0, true);
+  sensorState('tilt-state', health.mpu || 'Unknown');
+  $('#tilt-detail').textContent = 'Pitch and roll from the current MPU reading.';
 
-  const rainWetness = readings.rain_wetness_pct;
-  showMeasurement($('#rain-reading'), rainWetness, '%', 1);
-  sensorState('rain-state', rainWetness === null || rainWetness === undefined
-    ? (readings.rain_adc_raw === null ? 'Unavailable' : 'Uncalibrated') : (health.rain || 'Unknown'));
+  showMeasurement($('#rain-reading'), readings.rain_adc_raw, 'ADC', 0);
+  sensorState('rain-state', health.rain || 'Unknown');
   $('#rain-detail').textContent = readings.rain_adc_raw === null || readings.rain_adc_raw === undefined
-    ? 'Raw rain-plate ADC reading unavailable.' : `Raw ADC ${readings.rain_adc_raw} · relative plate wetness only`;
+    ? 'Raw rain-plate ADC reading unavailable.' : 'Direct raw analog-to-digital sensor count.';
 
-  showMeasurement($('#air-reading'), readings.temperature_c, '°C', 1);
+  showMeasurement($('#air-temperature'), readings.temperature_c, '\u00b0C', 0);
+  showMeasurement($('#air-humidity'), readings.humidity_pct, '% RH', 0);
   sensorState('air-state', health.dht11 || 'Unknown');
-  $('#air-detail').textContent = typeof readings.humidity_pct === 'number'
-    ? `Relative humidity ${readings.humidity_pct}% · DHT11.` : 'Humidity reading unavailable.';
+  $('#air-detail').textContent = 'Temperature and humidity from the DHT11 sensor.';
 
   $('#site-baseline').textContent = health.baseline_calibrated ? 'Calibrated' : 'Required';
   $('#site-test-mode').textContent = health.test_mode ? 'Enabled for this boot' : 'Off';
@@ -576,4 +573,4 @@ if ('serviceWorker' in navigator) addEventListener('load', () => {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 });
 refresh();
-setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+setInterval(() => { if (!document.hidden) refresh(); }, 2500);

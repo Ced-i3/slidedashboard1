@@ -96,9 +96,18 @@ test('public dashboard controls preserve device authentication and command lifec
     const pageHtml = await page.text();
     assert.match(pageHtml, /Public station controls/);
     assert.doesNotMatch(pageHtml, /authGate|loginPassword|Dashboard password|Sign in to monitor/);
+    assert.match(pageHtml, /Soil ADC/);
+    assert.match(pageHtml, /MPU pitch \/ roll/);
+    assert.match(pageHtml, /Temperature \/ humidity/);
+    assert.doesNotMatch(pageHtml, /lcd-panel/);
     const script = await fetch(`${base}/app.js`);
     assert.equal(script.status, 200);
     assert.match(script.headers.get('content-type') || '', /javascript/);
+    const appScript = await script.text();
+    assert.match(appScript, /readings\.soil_adc_raw/);
+    assert.match(appScript, /readings\.pitch_deg/);
+    assert.match(appScript, /readings\.humidity_pct/);
+    assert.doesNotMatch(appScript, /Uncalibrated/);
     const icon = await fetch(`${base}/assets/icon-192.png`);
     assert.equal(icon.status, 200);
     assert.match(icon.headers.get('content-type') || '', /image\/png/);
@@ -120,6 +129,13 @@ test('public dashboard controls preserve device authentication and command lifec
       'device command polling still requires device authentication');
     assert.equal((await fetch(`${base}/api/v1/session`)).status, 404,
       'dashboard session routes are removed');
+
+    const verification = await fetch(`${base}/api/v1/device/verify`, {
+      method: 'POST', headers: deviceHeaders,
+      body: JSON.stringify({ schema_version: 1, device_id: 'SLIDE-TEST', boot_id: bootId }),
+    });
+    assert.equal(verification.status, 200);
+    assert.equal((await verification.json()).telemetry_interval_s, 2.5);
 
     const sendTelemetry = async (sequence, observedAt) => fetch(`${base}/api/v1/device/telemetry`, {
       method: 'POST', headers: deviceHeaders, body: JSON.stringify(telemetry(sequence, observedAt)),

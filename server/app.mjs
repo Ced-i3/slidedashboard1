@@ -419,7 +419,7 @@ async function handleApi(request, response, url) {
       return;
     }
     json(response, 200, { verified: true, schema_version: 1, server_time: new Date().toISOString(),
-      telemetry_interval_s: 5, command_poll_interval_s: 5 });
+      telemetry_interval_s: 2.5, command_poll_interval_s: 5 });
     return;
   }
 

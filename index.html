@@ -55,24 +55,24 @@
 
       <div class="sensors">
         <article class="sensor-card">
-          <div class="title"><i class="moist" aria-hidden="true">◒</i><strong>Soil wetness</strong><em id="soil-state">Waiting</em></div>
-          <div id="soil-reading" class="reading">—<small>unavailable</small></div>
+          <div class="title"><i class="moist" aria-hidden="true">◒</i><strong>Soil ADC</strong><em id="soil-state">Waiting</em></div>
+          <div id="soil-reading" class="reading">&#8212;<small>ADC counts</small></div>
           <div class="sensor-detail" id="soil-detail">Waiting for a device reading.</div>
         </article>
         <article class="sensor-card">
-          <div class="title"><i class="tilt" aria-hidden="true">◿</i><strong>Relative tilt</strong><em id="tilt-state">Waiting</em></div>
-          <div id="tilt-reading" class="reading">—<small>unavailable</small></div>
-          <div class="sensor-detail" id="tilt-detail">A valid, calibrated baseline is required.</div>
+          <div class="title"><i class="tilt" aria-hidden="true">◿</i><strong>MPU pitch / roll</strong><em id="tilt-state">Waiting</em></div>
+          <div class="reading pair-reading"><span id="pitch-reading">&#8212;<small>pitch</small></span><span id="roll-reading">&#8212;<small>roll</small></span></div>
+          <div class="sensor-detail" id="tilt-detail">Waiting for an MPU reading.</div>
         </article>
         <article class="sensor-card">
-          <div class="title"><i class="rain" aria-hidden="true">☁</i><strong>Rain-plate wetness</strong><em id="rain-state">Waiting</em></div>
-          <div id="rain-reading" class="reading">—<small>unavailable</small></div>
-          <div class="sensor-detail" id="rain-detail">Plate wetness is not rainfall intensity.</div>
+          <div class="title"><i class="rain" aria-hidden="true">☁</i><strong>Rain ADC</strong><em id="rain-state">Waiting</em></div>
+          <div id="rain-reading" class="reading">&#8212;<small>ADC counts</small></div>
+          <div class="sensor-detail" id="rain-detail">Waiting for a device reading.</div>
         </article>
         <article class="sensor-card">
-          <div class="title"><i class="temp" aria-hidden="true">♨</i><strong>Air temperature</strong><em id="air-state">Waiting</em></div>
-          <div id="air-reading" class="reading">—<small>unavailable</small></div>
-          <div class="sensor-detail" id="air-detail">Humidity unavailable.</div>
+          <div class="title"><i class="temp" aria-hidden="true">♨</i><strong>Temperature / humidity</strong><em id="air-state">Waiting</em></div>
+          <div class="reading pair-reading"><span id="air-temperature">&#8212;<small>&#176;C</small></span><span id="air-humidity">&#8212;<small>% RH</small></span></div>
+          <div class="sensor-detail" id="air-detail">Waiting for a DHT11 reading.</div>
         </article>
       </div>
 

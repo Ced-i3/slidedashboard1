@@ -356,7 +356,7 @@ async function route(client, request, url, config) {
     if (body.schema_version !== 1 || body.device_id !== config.deviceId || !validateBoot(body.boot_id))
       return json(400, { error: 'invalid_request', message: 'Invalid device verification payload.' });
     return json(200, { verified: true, schema_version: 1, server_time: new Date().toISOString(),
-      telemetry_interval_s: 5, command_poll_interval_s: 5 });
+      telemetry_interval_s: 2.5, command_poll_interval_s: 5 });
   }
 
   if (pathname === '/api/v1/device/telemetry' && request.method === 'POST') {
