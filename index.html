@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#064b37">
+  <meta name="theme-color" content="#102e26">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -14,178 +14,147 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <aside id="sidebar">
+  <aside id="sidebar" aria-label="Dashboard navigation">
     <a class="brand" href="#overview" data-view="overview">
       <img src="assets/slide-logo.png" alt="">
-      <span><strong>S.L.I.D.E.</strong><small>Field monitor</small></span>
+      <span><strong>S.L.I.D.E.</strong><small>Field monitoring</small></span>
     </a>
-    <button id="collapseButton" aria-label="Collapse navigation">‹</button>
     <nav aria-label="Main navigation">
-      <a href="#overview" data-view="overview" aria-current="page"><i>▦</i><span>Overview</span></a>
-      <button id="alertsButton" type="button"><i>♧</i><span>Alerts</span><b id="alertCount" hidden></b></button>
-      <a href="#history" data-view="history"><i>↶</i><span>History</span></a>
-      <a href="#sites" data-view="sites"><i>⌖</i><span>Monitoring site</span></a>
+      <a href="#overview" data-view="overview" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Overview</span>
+      </a>
+      <button id="alertsButton" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span>Alerts</span><b id="alertCount" hidden></b>
+      </button>
+      <a href="#history" data-view="history">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/></svg><span>History</span>
+      </a>
+      <a href="#sites" data-view="sites">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Monitoring site</span>
+      </a>
+      <a class="settings-link" href="#settings" data-view="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.7 1.7 0 0 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a1.7 1.7 0 0 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 0 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a1.7 1.7 0 0 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 0 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2V2a1.7 1.7 0 0 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 0 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a1.7 1.7 0 0 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z"/></svg><span>Alert settings</span>
+      </a>
     </nav>
-    <div class="mountains" aria-hidden="true"></div>
-    <a class="settings" href="#settings" data-view="settings"><i>⚙</i><span>Station settings</span></a>
+    <div class="rail-foot"><span class="rail-mark" aria-hidden="true">S</span><span><strong>Field system</strong><small>Sensor monitoring</small></span></div>
   </aside>
   <button id="scrim" aria-label="Close menu"></button>
 
   <main>
-    <div class="mobile">
-      <button id="menuButton" type="button" aria-label="Open menu">☰</button>
-      <img src="assets/slide-logo.png" alt="">
-      <strong>S.L.I.D.E.</strong>
+    <div class="mobile-bar">
+      <a class="mobile-brand" href="#overview" data-view="overview"><img src="assets/slide-logo.png" alt=""><span>S.L.I.D.E.</span></a>
       <span id="mobileStatus" class="status-chip" data-state="loading">Loading</span>
     </div>
 
-    <section class="view" data-page="overview">
-      <header>
-        <div>
-          <p id="station-location" class="location">Monitoring station</p>
+    <section class="view overview-view" data-page="overview">
+      <header class="page-head">
+        <div class="page-title">
+          <p id="station-location" class="eyebrow">Monitoring station</p>
           <h1>Station overview</h1>
-          <p class="subtitle">Observed conditions and device health</p>
+          <p class="subtitle">Live measurements from your monitoring point.</p>
         </div>
-        <div class="updated">
-          <span aria-hidden="true">◷</span>
+        <div class="received-box">
+          <span class="received-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
           <span><small>Last received</small><strong id="last-updated">Waiting for first upload</strong><small id="last-observed">Observation time unavailable</small></span>
         </div>
       </header>
-      <div id="live-banner" class="live-banner" data-state="loading" role="status" aria-live="polite">Connecting to the station service…</div>
 
-      <div id="threshold-banner" class="live-banner" data-state="loading" role="alert">Waiting for fresh readings to check alert thresholds.</div>
+      <div class="connection-strip"><span class="connection-indicator" aria-hidden="true"></span><div id="live-banner" data-state="loading" role="status" aria-live="polite">Connecting to the station service…</div></div>
 
-      <div class="sensors">
-        <article class="sensor-card">
-          <div class="title"><i class="moist" aria-hidden="true">◒</i><strong>Soil ADC</strong><em id="soil-state">Waiting</em></div>
-          <div id="soil-reading" class="reading">&#8212;<small>ADC counts</small></div>
-          <div class="sensor-detail" id="soil-detail">Waiting for a device reading.</div>
-        </article>
-        <article class="sensor-card">
-          <div class="title"><i class="tilt" aria-hidden="true">◿</i><strong>MPU pitch / roll</strong><em id="tilt-state">Waiting</em></div>
-          <div class="reading pair-reading"><span id="pitch-reading">&#8212;<small>pitch</small></span><span id="roll-reading">&#8212;<small>roll</small></span></div>
-          <div class="sensor-detail" id="tilt-detail">Waiting for an MPU reading.</div>
-        </article>
-        <article class="sensor-card">
-          <div class="title"><i class="rain" aria-hidden="true">☁</i><strong>Rain ADC</strong><em id="rain-state">Waiting</em></div>
-          <div id="rain-reading" class="reading">&#8212;<small>ADC counts</small></div>
-          <div class="sensor-detail" id="rain-detail">Waiting for a device reading.</div>
-        </article>
-        <article class="sensor-card">
-          <div class="title"><i class="temp" aria-hidden="true">♨</i><strong>Temperature / humidity</strong><em id="air-state">Waiting</em></div>
-          <div class="reading pair-reading"><span id="air-temperature">&#8212;<small>&#176;C</small></span><span id="air-humidity">&#8212;<small>% RH</small></span></div>
-          <div class="sensor-detail" id="air-detail">Waiting for a DHT11 reading.</div>
-        </article>
-      </div>
-
-      <section class="panel chart-panel delivery-panel" aria-labelledby="delivery-heading">
-        <div class="panel-head"><div><h2 id="delivery-heading">Upload delivery</h2><p class="chart-note">Device-side event queue counters from the latest received snapshot.</p></div></div>
-        <dl>
-          <div><dt>Queued event revisions</dt><dd id="delivery-queue">Waiting for telemetry</dd></div>
-          <div><dt>Events discarded on queue overflow</dt><dd id="delivery-dropped">Waiting for telemetry</dd></div>
-          <div><dt>Event upload retries this boot</dt><dd id="delivery-retries">Waiting for telemetry</dd></div>
-          <div><dt>Last accepted upload (device uptime)</dt><dd id="delivery-last-success">Waiting for telemetry</dd></div>
-        </dl>
-        <p id="delivery-observed-at" class="chart-note">Delivery counters are not yet available.</p>
+      <section class="threshold-panel" aria-label="Automatic threshold alert status">
+        <div class="threshold-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg></div>
+        <div class="threshold-copy"><span class="overline">AUTOMATIC ALERT CHECK</span><div id="threshold-banner" data-state="loading" role="alert" aria-live="polite">Waiting for fresh readings to check alert thresholds.</div></div>
+        <a href="#settings" data-view="settings" class="threshold-settings">Thresholds <span aria-hidden="true">↗</span></a>
       </section>
 
-      <section class="panel chart-panel">
-        <div class="panel-head">
-          <div><h2>Recorded conditions</h2><p class="chart-note">Each trace uses its own unit and scale. Missing samples remain gaps.</p></div>
-          <div class="periods" role="group" aria-label="Chart period">
-            <button type="button" data-range="24h" class="active" aria-pressed="true">24 hours</button>
-            <button type="button" data-range="7d" aria-pressed="false">7 days</button>
-            <button type="button" data-range="30d" aria-pressed="false">30 days</button>
-          </div>
+      <section class="reading-layout" aria-label="Latest sensor readings">
+        <article class="sensor-card soil-card">
+          <div class="sensor-top"><div class="sensor-name"><span class="sensor-symbol soil-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6c4 0 4 2 8 2s4-2 8-2M4 12c4 0 4 2 8 2s4-2 8-2M4 18c4 0 4 2 8 2s4-2 8-2"/></svg></span><span><span class="eyebrow">GROUND CONDITION</span><strong>Soil sensor</strong></span></div><em id="soil-state" class="sensor-state">Waiting</em></div>
+          <div id="soil-reading" class="reading primary-reading">&#8212;<small>ADC counts</small></div>
+          <div class="sensor-foot"><span id="soil-detail">Waiting for a device reading.</span><span class="unit-note">RAW INPUT</span></div>
+        </article>
+
+        <div class="sensor-stack">
+        <article class="sensor-card tilt-card">
+          <div class="sensor-top"><div class="sensor-name"><span class="sensor-symbol tilt-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19 18 5m-8 14h10V9"/><circle cx="8" cy="15" r="1.5"/></svg></span><span><span class="eyebrow">SLOPE POSITION</span><strong>MPU orientation</strong></span></div><em id="tilt-state" class="sensor-state">Waiting</em></div>
+          <div class="reading-pair"><span id="pitch-reading">&#8212;<small>Pitch</small></span><span id="roll-reading">&#8212;<small>Roll</small></span></div>
+          <div class="sensor-foot"><span id="tilt-detail">Waiting for an MPU reading.</span><span class="unit-note">DEGREES</span></div>
+        </article>
+
+        <article class="sensor-card rain-card">
+          <div class="sensor-top"><div class="sensor-name"><span class="sensor-symbol rain-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 16a4 4 0 0 1-.3-8A5.5 5.5 0 0 1 17 9a3.5 3.5 0 0 1 0 7H7Zm1 3-1 2m7-2-1 2m7-2-1 2"/></svg></span><span><span class="eyebrow">PRECIPITATION INPUT</span><strong>Rain plate</strong></span></div><em id="rain-state" class="sensor-state">Waiting</em></div>
+          <div id="rain-reading" class="reading">&#8212;<small>ADC counts</small></div>
+          <div class="sensor-foot"><span id="rain-detail">Waiting for a device reading.</span><span class="unit-note">RAW INPUT</span></div>
+        </article>
+
+        <article class="sensor-card air-card">
+          <div class="sensor-top"><div class="sensor-name"><span class="sensor-symbol air-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v9m0 0a4 4 0 1 0 4 4V7a4 4 0 0 0-8 0v9a4 4 0 0 0 4 4"/><path d="M12 15v-3"/></svg></span><span><span class="eyebrow">AMBIENT CONDITIONS</span><strong>Air sensor</strong></span></div><em id="air-state" class="sensor-state">Waiting</em></div>
+          <div class="reading-pair air-pair"><span id="air-temperature">&#8212;<small>Temperature</small></span><span id="air-humidity">&#8212;<small>Humidity</small></span></div>
+          <div class="sensor-foot"><span id="air-detail">Waiting for a DHT11 reading.</span><span class="unit-note">DHT11</span></div>
+        </article>
+        </div>
+      </section>
+
+      <section class="panel trend-panel" aria-labelledby="trend-heading">
+        <div class="section-head"><div><span class="overline">EVIDENCE OVER TIME</span><h2 id="trend-heading">Recorded conditions</h2><p class="section-note">Independent scales by sensor. Missing observations are shown as gaps.</p></div>
+          <div class="periods" role="group" aria-label="Chart period"><button type="button" data-range="24h" class="active" aria-pressed="true">24 hours</button><button type="button" data-range="7d" aria-pressed="false">7 days</button><button type="button" data-range="30d" aria-pressed="false">30 days</button></div>
         </div>
         <div class="trend-grid">
-          <article><h3>Soil ADC (raw)</h3><svg id="soil-chart" viewBox="0 0 300 90" role="img" aria-label="Soil ADC history"></svg><p id="soil-chart-range" class="chart-note">Waiting for history.</p></article>
-          <article><h3>MPU alert angle (degrees)</h3><svg id="tilt-chart" viewBox="0 0 300 90" role="img" aria-label="MPU alert angle history"></svg><p id="tilt-chart-range" class="chart-note">Waiting for history.</p></article>
-          <article><h3>Air temperature (°C)</h3><svg id="air-chart" viewBox="0 0 300 90" role="img" aria-label="Air temperature history"></svg><p id="air-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><div class="trend-label"><span class="legend-dot soil-dot"></span><h3>Soil ADC</h3><small>raw counts</small></div><svg id="soil-chart" viewBox="0 0 300 90" role="img" aria-label="Soil ADC history"></svg><p id="soil-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><div class="trend-label"><span class="legend-dot tilt-dot"></span><h3>MPU alert angle</h3><small>degrees</small></div><svg id="tilt-chart" viewBox="0 0 300 90" role="img" aria-label="MPU alert angle history"></svg><p id="tilt-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><div class="trend-label"><span class="legend-dot air-dot"></span><h3>Air temperature</h3><small>°C</small></div><svg id="air-chart" viewBox="0 0 300 90" role="img" aria-label="Air temperature history"></svg><p id="air-chart-range" class="chart-note">Waiting for history.</p></article>
         </div>
       </section>
+
+      <details class="panel delivery-panel">
+        <summary><span><span class="overline">DEVICE HEALTH</span><strong id="delivery-heading">Upload delivery</strong><small>Device event queue counters from the latest snapshot</small></span><span class="details-toggle" aria-hidden="true">+</span></summary>
+        <dl><div><dt>Queued event revisions</dt><dd id="delivery-queue">Waiting for telemetry</dd></div><div><dt>Events discarded on queue overflow</dt><dd id="delivery-dropped">Waiting for telemetry</dd></div><div><dt>Event upload retries this boot</dt><dd id="delivery-retries">Waiting for telemetry</dd></div><div><dt>Last accepted upload (device uptime)</dt><dd id="delivery-last-success">Waiting for telemetry</dd></div></dl>
+        <p id="delivery-observed-at" class="chart-note">Delivery counters are not yet available.</p>
+      </details>
     </section>
 
-    <section class="view" data-page="history" hidden>
-      <header>
-        <div><p class="eyebrow">Stored station readings</p><h1>Reading history</h1><p class="subtitle">Alert angle uses absolute pitch/roll. ADC columns also include optional firmware wetness values.</p></div>
-        <a class="secondary" href="/api/v1/readings.csv" id="exportCsv">Export CSV</a>
-      </header>
-      <section class="panel section">
-        <div class="filters"><label>Period<select id="historyRange"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label></div>
+    <section class="view secondary-view" data-page="history" hidden>
+      <header class="page-head"><div class="page-title"><p class="eyebrow">STORED STATION READINGS</p><h1>Reading history</h1><p class="subtitle">Review recorded sensor measurements and device health.</p></div><a class="button-secondary" href="/api/v1/readings.csv" id="exportCsv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></svg>Export CSV</a></header>
+      <section class="panel data-panel"><div class="filter-row"><div><span class="overline">OBSERVATION LOG</span><h2>Sensor readings</h2></div><label for="historyRange">Time period<select id="historyRange"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label></div>
         <p id="history-status" class="chart-note" role="status">Waiting for the station service.</p>
-        <div class="table"><table><thead><tr><th>Received</th><th>Observed</th><th>Soil ADC / wetness</th><th>Rain ADC / plate wetness</th><th>MPU alert angle</th><th>Temperature</th><th>Device health</th></tr></thead><tbody id="history-rows"><tr><td colspan="7">No readings have arrived.</td></tr></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Received</th><th>Observed</th><th>Soil ADC / wetness</th><th>Rain ADC / plate wetness</th><th>MPU alert angle</th><th>Temperature</th><th>Device health</th></tr></thead><tbody id="history-rows"><tr><td colspan="7">No readings have arrived.</td></tr></tbody></table></div>
       </section>
     </section>
 
-    <section class="view" data-page="sites" hidden>
-      <header><div><p class="eyebrow">Station location and health</p><h1>Monitoring site</h1><p class="subtitle">Coordinates locate the monitoring station.</p></div></header>
-      <div class="two-col">
-        <section class="panel map" aria-label="Station location">
-          <div id="map-empty" class="map-empty">Station coordinates are not available yet.</div>
-          <a id="map-marker" class="map-marker" hidden target="_blank" rel="noopener noreferrer" aria-label="Open station coordinates in maps">⌖</a>
-        </section>
-        <section class="panel station">
-          <span id="site-status" class="status-chip" data-state="loading">Waiting</span>
-          <p class="eyebrow">Device</p><h2 id="site-device-id">Waiting for device</h2>
-          <p id="site-coordinates">Coordinates unavailable.</p>
-          <dl>
-            <div><dt>Last device contact</dt><dd id="site-last-seen">No contact recorded</dd></div>
-            <div><dt>GPS fix</dt><dd id="site-gps-status">Unavailable</dd></div>
-            <div><dt>Satellites</dt><dd id="site-satellites">Unavailable</dd></div>
-            <div><dt>Alert evaluation</dt><dd id="site-alert-mode">Waiting for telemetry</dd></div>
-            <div><dt>Angle reference</dt><dd>Sensor axes · no mounted baseline</dd></div>
-          </dl>
-        </section>
+    <section class="view secondary-view" data-page="sites" hidden>
+      <header class="page-head"><div class="page-title"><p class="eyebrow">LOCATION AND DEVICE HEALTH</p><h1>Monitoring site</h1><p class="subtitle">Station position and the latest connection details.</p></div></header>
+      <div class="site-layout"><section class="panel map" aria-label="Station location"><div id="map-empty" class="map-empty">Station coordinates are not available yet.</div><a id="map-marker" class="map-marker" hidden target="_blank" rel="noopener noreferrer" aria-label="Open station coordinates in maps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></a><span class="map-caption">MONITORING STATION LOCATION</span></section>
+        <section class="panel station-panel"><div class="station-top"><span class="overline">CONNECTED DEVICE</span><span id="site-status" class="status-chip" data-state="loading">Waiting</span></div><h2 id="site-device-id">Waiting for device</h2><p id="site-coordinates">Coordinates unavailable.</p><dl><div><dt>Last device contact</dt><dd id="site-last-seen">No contact recorded</dd></div><div><dt>GPS fix</dt><dd id="site-gps-status">Unavailable</dd></div><div><dt>Satellites</dt><dd id="site-satellites">Unavailable</dd></div><div><dt>Alert evaluation</dt><dd id="site-alert-mode">Waiting for telemetry</dd></div><div><dt>Angle reference</dt><dd>Sensor axes · no mounted baseline</dd></div></dl></section>
       </div>
     </section>
 
-    <section class="view" data-page="settings" hidden>
-      <header><div><p class="eyebrow">Automatic browser alerts</p><h1>Alert settings</h1><p class="subtitle">Compare incoming values directly with your thresholds.</p></div></header>
-      <p id="threshold-feedback" class="live-banner" role="status">Thresholds load when the station identity is available.</p>
-      <div class="two-col settings-grid">
-        <section class="panel form">
-          <h2>MPU angle thresholds</h2>
-          <p>No calibration or Experimental Test mode is required. Each fresh reading is checked immediately using the larger absolute pitch or roll angle.</p>
-          <label class="test-mode-row">Enable MPU alerts <input id="mpu-enabled" type="checkbox" checked></label>
-          <div class="mini-grid">
-            <label for="caution">CAUTION (°)<input id="caution" type="number" min="0.1" max="180" step="0.1" value="3"></label>
-            <label for="warning">WARNING (°)<input id="warning" type="number" min="0.1" max="180" step="0.1" value="5"></label>
-            <label for="critical">CRITICAL (°)<input id="critical" type="number" min="0.1" max="180" step="0.1" value="10"></label>
-          </div>
-          <p class="meta">Angle = max(|pitch|, |roll|), relative to the sensor axes. A tilted installation can trigger immediately. This does not measure change from a mounted baseline.</p>
+    <section class="view secondary-view" data-page="settings" hidden>
+      <header class="page-head"><div class="page-title"><p class="eyebrow">AUTOMATIC BROWSER ALERTS</p><h1>Alert settings</h1><p class="subtitle">Choose the limits checked against each fresh incoming reading.</p></div></header>
+      <div id="threshold-feedback" class="feedback-note" role="status">Thresholds load when the station identity is available.</div>
+      <div class="settings-layout">
+        <section class="panel form-panel"><div class="form-heading"><span class="sensor-symbol tilt-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19 18 5m-8 14h10V9"/><circle cx="8" cy="15" r="1.5"/></svg></span><div><span class="overline">SLOPE POSITION</span><h2>MPU angle thresholds</h2></div></div><p>Each fresh reading is checked using the larger absolute pitch or roll angle. No calibration or Experimental Test mode is needed.</p><label class="toggle-row" for="mpu-enabled"><span><strong>MPU angle alerts</strong><small>Check pitch and roll on each update</small></span><input id="mpu-enabled" type="checkbox" checked></label>
+          <div class="threshold-fields"><label for="caution">Caution <span>degrees</span><input id="caution" type="number" min="0.1" max="180" step="0.1" value="3"></label><label for="warning">Warning <span>degrees</span><input id="warning" type="number" min="0.1" max="180" step="0.1" value="5"></label><label for="critical">Critical <span>degrees</span><input id="critical" type="number" min="0.1" max="180" step="0.1" value="10"></label></div><p class="field-note">Angle = max(|pitch|, |roll|), relative to the sensor axes. A tilted installation may trigger immediately; there is no mounted baseline.</p>
         </section>
-        <section class="panel form">
-          <h2>Soil and rain ADC thresholds</h2>
-          <p>Raw ADC readings create CAUTION alerts at the selected limit. Choose “At or below” if wetter conditions lower your sensor’s readings.</p>
-          <label class="test-mode-row">Enable soil alerts <input id="soil-enabled" type="checkbox" checked></label>
-          <label for="soil-threshold">Soil threshold (raw ADC)<input id="soil-threshold" type="number" min="0" max="4095" step="1" value="3000"></label>
-          <label for="soil-direction">Soil alert direction<select id="soil-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
-          <label class="test-mode-row">Enable rain alerts <input id="rain-enabled" type="checkbox" checked></label>
-          <label for="rain-threshold">Rain threshold (raw ADC)<input id="rain-threshold" type="number" min="0" max="4095" step="1" value="3000"></label>
-          <label for="rain-direction">Rain alert direction<select id="rain-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
-          <p class="meta">ADC values range from 0 to 4095. These are not wetness percentages or rainfall measurements.</p>
+        <section class="panel form-panel"><div class="form-heading"><span class="sensor-symbol soil-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6c4 0 4 2 8 2s4-2 8-2M4 12c4 0 4 2 8 2s4-2 8-2M4 18c4 0 4 2 8 2s4-2 8-2"/></svg></span><div><span class="overline">GROUND AND RAIN INPUTS</span><h2>ADC thresholds</h2></div></div><p>Set independent limits for the soil and rain sensors. Select the direction that matches your hardware.</p>
+          <label class="toggle-row" for="soil-enabled"><span><strong>Soil alerts</strong><small>Alert when raw ADC meets the limit</small></span><input id="soil-enabled" type="checkbox" checked></label><label class="setting-control" for="soil-threshold">Soil threshold <span>raw ADC</span><input id="soil-threshold" type="number" min="0" max="4095" step="1" value="3000"></label><label class="setting-control" for="soil-direction">Soil alert direction<select id="soil-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
+          <label class="toggle-row" for="rain-enabled"><span><strong>Rain alerts</strong><small>Alert when raw ADC meets the limit</small></span><input id="rain-enabled" type="checkbox" checked></label><label class="setting-control" for="rain-threshold">Rain threshold <span>raw ADC</span><input id="rain-threshold" type="number" min="0" max="4095" step="1" value="3000"></label><label class="setting-control" for="rain-direction">Rain alert direction<select id="rain-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
+          <p class="field-note">ADC values range from 0 to 4095. These are raw counts, not wetness percentages or rainfall measurements.</p>
         </section>
       </div>
-      <section class="panel section command-panel">
-        <h2>Automatic monitoring</h2>
-        <p>Alerts start when a fresh value meets or exceeds its limit (or falls to the selected lower ADC limit). A fresh reading in the normal range clears the condition. Missing or stale readings pause evaluation and keep existing alerts marked as unknown.</p>
-        <p>Settings are saved per station in this browser. Keep this dashboard open, visible and connected. Browser alert history lasts for this page session; device event history is stored separately on the server.</p>
-        <button id="save-thresholds" class="primary" type="button">Save alert thresholds</button>
-      </section>
+      <section class="panel monitoring-note"><div><span class="overline">HOW ALERTS WORK</span><h2>Automatic monitoring in this browser</h2><p>Fresh readings are checked against these limits. Normal readings clear the condition. Stale or unavailable readings pause evaluation and mark an active condition as unknown.</p><p>Settings are saved per station in this browser. Keep the dashboard open and connected to receive browser alerts. Browser alert history lasts for this page session.</p></div><button id="save-thresholds" class="button-primary" type="button">Save alert thresholds</button></section>
     </section>
-    <footer><span>S.L.I.D.E. reports experimental sensor conditions; it does not predict landslides.</span><span><i id="netDot" class="off"></i><span id="netStatus">Station data unavailable</span></span></footer>
+
+    <footer><span>S.L.I.D.E. reports experimental sensor conditions; it does not predict landslides.</span><span class="network-status"><i id="netDot" class="off"></i><span id="netStatus">Station data unavailable</span></span></footer>
   </main>
 
   <div class="modal-shell" id="modal" hidden>
     <button class="backdrop" data-close aria-label="Close alerts"></button>
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="alerts-heading">
-      <div class="modal-head"><div><p class="eyebrow">Browser and device events</p><h2 id="alerts-heading">Alerts</h2></div><button data-close aria-label="Close alerts">×</button></div>
+      <div class="modal-head"><div><p class="eyebrow">BROWSER AND DEVICE EVENTS</p><h2 id="alerts-heading">Alert log</h2></div><button data-close aria-label="Close alerts">×</button></div>
       <p class="modal-note">Browser alerts are generated from received values. Device events are reported separately by the firmware. Acknowledgment does not clear an active condition.</p>
       <div id="alert-list" class="alerts" aria-live="polite">Waiting for events.</div>
     </section>
   </div>
-
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
   <script src="app.js" type="module"></script>
 </body>
