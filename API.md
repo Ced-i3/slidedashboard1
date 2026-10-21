@@ -35,6 +35,8 @@ Public dashboard routes are `GET /dashboard`, `GET /readings?range=24h|7d|30d`, 
 
 Maintenance command kinds are `calibrate_mpu`, `set_test_mode`, `record_adc_endpoint`, `set_tilt_thresholds`, and `set_adc_settings`. Commands target the latest boot, expire after 120 seconds, and are accepted sequentially. Acknowledgment is server-side and does not change the firmware's active/resolved event state.
 
+The website now evaluates browser alerts from `GET /dashboard` using raw pitch/roll and soil/rain ADC values. Fresh telemetry and ONLINE sensor health are required; `baseline_calibrated` and `test_mode` are not prerequisites. Browser thresholds are stored per station/browser and saving them queues no maintenance command. Browser events and their acknowledgments last for the page session; existing firmware `/alerts` and `/commands` API behavior is preserved.
+
 ## Vercel primary deployment
 
 1. Import `Ced-i3/slidedashboard1` with the repository root as the Root Directory. The dashboard source is at the repository root; `vercel.json` runs its build script to create `dist`, while `api/v1/[...path].mjs` handles API routes. Build and output settings come from the repository, but Root Directory remains a Vercel project setting.

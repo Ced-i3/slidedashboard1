@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const OUTPUT = resolve(ROOT, 'dist');
-const PUBLIC_FILES = ['index.html', 'app.js', 'styles.css', 'manifest.webmanifest', 'sw.js'];
+const PUBLIC_FILES = ['index.html', 'app.js', 'threshold-alerts.js', 'styles.css', 'manifest.webmanifest', 'sw.js'];
 
 async function copyDirectory(source, destination) {
   await mkdir(destination, { recursive: true });

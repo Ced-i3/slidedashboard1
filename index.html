@@ -53,6 +53,8 @@
       </header>
       <div id="live-banner" class="live-banner" data-state="loading" role="status" aria-live="polite">Connecting to the station service…</div>
 
+      <div id="threshold-banner" class="live-banner" data-state="loading" role="alert">Waiting for fresh readings to check alert thresholds.</div>
+
       <div class="sensors">
         <article class="sensor-card">
           <div class="title"><i class="moist" aria-hidden="true">◒</i><strong>Soil ADC</strong><em id="soil-state">Waiting</em></div>
@@ -97,8 +99,8 @@
           </div>
         </div>
         <div class="trend-grid">
-          <article><h3>Soil wetness (%)</h3><svg id="soil-chart" viewBox="0 0 300 90" role="img" aria-label="Soil wetness history"></svg><p id="soil-chart-range" class="chart-note">Waiting for history.</p></article>
-          <article><h3>Relative tilt (degrees)</h3><svg id="tilt-chart" viewBox="0 0 300 90" role="img" aria-label="Relative tilt history"></svg><p id="tilt-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><h3>Soil ADC (raw)</h3><svg id="soil-chart" viewBox="0 0 300 90" role="img" aria-label="Soil ADC history"></svg><p id="soil-chart-range" class="chart-note">Waiting for history.</p></article>
+          <article><h3>MPU alert angle (degrees)</h3><svg id="tilt-chart" viewBox="0 0 300 90" role="img" aria-label="MPU alert angle history"></svg><p id="tilt-chart-range" class="chart-note">Waiting for history.</p></article>
           <article><h3>Air temperature (°C)</h3><svg id="air-chart" viewBox="0 0 300 90" role="img" aria-label="Air temperature history"></svg><p id="air-chart-range" class="chart-note">Waiting for history.</p></article>
         </div>
       </section>
@@ -106,13 +108,13 @@
 
     <section class="view" data-page="history" hidden>
       <header>
-        <div><p class="eyebrow">Stored station readings</p><h1>Reading history</h1><p class="subtitle">Values use the device’s available calibration and sensor units.</p></div>
+        <div><p class="eyebrow">Stored station readings</p><h1>Reading history</h1><p class="subtitle">Alert angle uses absolute pitch/roll. ADC columns also include optional firmware wetness values.</p></div>
         <a class="secondary" href="/api/v1/readings.csv" id="exportCsv">Export CSV</a>
       </header>
       <section class="panel section">
         <div class="filters"><label>Period<select id="historyRange"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label></div>
         <p id="history-status" class="chart-note" role="status">Waiting for the station service.</p>
-        <div class="table"><table><thead><tr><th>Received</th><th>Observed</th><th>Soil ADC / wetness</th><th>Rain ADC / plate wetness</th><th>Relative tilt</th><th>Temperature</th><th>Device health</th></tr></thead><tbody id="history-rows"><tr><td colspan="7">No readings have arrived.</td></tr></tbody></table></div>
+        <div class="table"><table><thead><tr><th>Received</th><th>Observed</th><th>Soil ADC / wetness</th><th>Rain ADC / plate wetness</th><th>MPU alert angle</th><th>Temperature</th><th>Device health</th></tr></thead><tbody id="history-rows"><tr><td colspan="7">No readings have arrived.</td></tr></tbody></table></div>
       </section>
     </section>
 
@@ -131,64 +133,60 @@
             <div><dt>Last device contact</dt><dd id="site-last-seen">No contact recorded</dd></div>
             <div><dt>GPS fix</dt><dd id="site-gps-status">Unavailable</dd></div>
             <div><dt>Satellites</dt><dd id="site-satellites">Unavailable</dd></div>
-            <div><dt>MPU baseline</dt><dd id="site-baseline">Unavailable</dd></div>
-            <div><dt>Experimental TEST MODE</dt><dd id="site-test-mode">Off or unavailable</dd></div>
+            <div><dt>Alert evaluation</dt><dd id="site-alert-mode">Waiting for telemetry</dd></div>
+            <div><dt>Angle reference</dt><dd>Sensor axes · no mounted baseline</dd></div>
           </dl>
         </section>
       </div>
     </section>
 
     <section class="view" data-page="settings" hidden>
-      <header><div><p class="eyebrow">Public station controls</p><h1>Station settings</h1><p class="subtitle">Anyone on the internet can view station data, change device settings, and acknowledge events. Commands require an online station and expire if it disconnects.</p></div></header>
-      <p id="command-feedback" class="live-banner" role="status">Control status loads from the station.</p>
+      <header><div><p class="eyebrow">Automatic browser alerts</p><h1>Alert settings</h1><p class="subtitle">Compare incoming values directly with your thresholds.</p></div></header>
+      <p id="threshold-feedback" class="live-banner" role="status">Thresholds load when the station identity is available.</p>
       <div class="two-col settings-grid">
         <section class="panel form">
-          <h2>Baseline and experimental mode</h2>
-          <p>Calibrate with the MPU stationary and firmly mounted. TEST MODE is disabled whenever the ESP32 restarts.</p>
-          <div id="calibration-detail" class="meta">Calibration state unavailable.</div>
-          <button class="primary" id="calibrate-mpu" type="button">Calibrate MPU baseline</button>
-          <label class="test-mode-row">Enable experimental TEST MODE <input id="testModeToggle" type="checkbox"></label>
-          <h3>Experimental tilt criteria</h3>
+          <h2>MPU angle thresholds</h2>
+          <p>No calibration or Experimental Test mode is required. Each fresh reading is checked immediately using the larger absolute pitch or roll angle.</p>
+          <label class="test-mode-row">Enable MPU alerts <input id="mpu-enabled" type="checkbox" checked></label>
           <div class="mini-grid">
-            <label>CAUTION (°)<input id="caution" type="number" min="3" max="89" step="1" value="3"></label>
-            <label>WARNING (°)<input id="warning" type="number" min="4" max="90" step="1" value="5"></label>
-            <label>CRITICAL (°)<input id="critical" type="number" min="5" max="90" step="1" value="10"></label>
-            <label>CAUTION (s)<input id="caution-s" type="number" min="1" max="3600" value="10"></label>
-            <label>WARNING (s)<input id="warning-s" type="number" min="1" max="3600" value="5"></label>
-            <label>CRITICAL (s)<input id="critical-s" type="number" min="1" max="3600" value="5"></label>
+            <label for="caution">CAUTION (°)<input id="caution" type="number" min="0.1" max="180" step="0.1" value="3"></label>
+            <label for="warning">WARNING (°)<input id="warning" type="number" min="0.1" max="180" step="0.1" value="5"></label>
+            <label for="critical">CRITICAL (°)<input id="critical" type="number" min="0.1" max="180" step="0.1" value="10"></label>
           </div>
-          <button class="secondary" id="save-tilt" type="button">Save tilt criteria</button>
-          <p class="meta">These are experimental demonstration settings, not validated landslide predictions.</p>
+          <p class="meta">Angle = max(|pitch|, |roll|), relative to the sensor axes. A tilted installation can trigger immediately. This does not measure change from a mounted baseline.</p>
         </section>
         <section class="panel form">
-          <h2>Soil and rain-plate calibration</h2>
-          <p>Record observed dry and wet raw endpoints separately for each sensor. Values remain relative wetness.</p>
-          <label>Sensor<select id="adc-sensor"><option value="0">Soil</option><option value="1">Rain plate</option></select></label>
-          <div id="adc-calibration" class="meta">Calibration state unavailable.</div>
-          <div class="button-row"><button class="secondary" id="record-dry" type="button">Record dry endpoint</button><button class="secondary" id="record-wet" type="button">Record wet endpoint</button></div>
-          <label>Wetness threshold (%)<input id="adc-threshold" type="number" min="1" max="100" step="1" value="80"></label>
-          <label>Duration (seconds)<input id="adc-seconds" type="number" min="1" max="3600" value="10"></label>
-          <label class="test-mode-row">Enable this experimental ADC event <input id="adc-enabled" type="checkbox"></label>
-          <button class="secondary" id="save-adc" type="button">Save wetness rule</button>
-          <p class="meta">The rain plate does not measure rainfall in millimetres or millimetres per hour.</p>
+          <h2>Soil and rain ADC thresholds</h2>
+          <p>Raw ADC readings create CAUTION alerts at the selected limit. Choose “At or below” if wetter conditions lower your sensor’s readings.</p>
+          <label class="test-mode-row">Enable soil alerts <input id="soil-enabled" type="checkbox" checked></label>
+          <label for="soil-threshold">Soil threshold (raw ADC)<input id="soil-threshold" type="number" min="0" max="4095" step="1" value="3000"></label>
+          <label for="soil-direction">Soil alert direction<select id="soil-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
+          <label class="test-mode-row">Enable rain alerts <input id="rain-enabled" type="checkbox" checked></label>
+          <label for="rain-threshold">Rain threshold (raw ADC)<input id="rain-threshold" type="number" min="0" max="4095" step="1" value="3000"></label>
+          <label for="rain-direction">Rain alert direction<select id="rain-direction"><option value="above">At or above (≥)</option><option value="below">At or below (≤)</option></select></label>
+          <p class="meta">ADC values range from 0 to 4095. These are not wetness percentages or rainfall measurements.</p>
         </section>
       </div>
-      <section class="panel section command-panel"><h2>Recent maintenance commands</h2><p class="chart-note">A queued action is not complete until the station returns its result.</p><div id="command-list">No commands loaded.</div></section>
+      <section class="panel section command-panel">
+        <h2>Automatic monitoring</h2>
+        <p>Alerts start when a fresh value meets or exceeds its limit (or falls to the selected lower ADC limit). A fresh reading in the normal range clears the condition. Missing or stale readings pause evaluation and keep existing alerts marked as unknown.</p>
+        <p>Settings are saved per station in this browser. Keep this dashboard open, visible and connected. Browser alert history lasts for this page session; device event history is stored separately on the server.</p>
+        <button id="save-thresholds" class="primary" type="button">Save alert thresholds</button>
+      </section>
     </section>
-
     <footer><span>S.L.I.D.E. reports experimental sensor conditions; it does not predict landslides.</span><span><i id="netDot" class="off"></i><span id="netStatus">Station data unavailable</span></span></footer>
   </main>
 
   <div class="modal-shell" id="modal" hidden>
     <button class="backdrop" data-close aria-label="Close alerts"></button>
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="alerts-heading">
-      <div class="modal-head"><div><p class="eyebrow">Station event history</p><h2 id="alerts-heading">Alerts</h2></div><button data-close aria-label="Close alerts">×</button></div>
-      <p class="modal-note">These events describe experimental sensor conditions. Acknowledgment does not clear an active condition.</p>
+      <div class="modal-head"><div><p class="eyebrow">Browser and device events</p><h2 id="alerts-heading">Alerts</h2></div><button data-close aria-label="Close alerts">×</button></div>
+      <p class="modal-note">Browser alerts are generated from received values. Device events are reported separately by the firmware. Acknowledgment does not clear an active condition.</p>
       <div id="alert-list" class="alerts" aria-live="polite">Waiting for events.</div>
     </section>
   </div>
 
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
-  <script src="app.js" defer></script>
+  <script src="app.js" type="module"></script>
 </body>
 </html>

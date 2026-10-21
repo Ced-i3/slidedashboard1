@@ -30,7 +30,17 @@ The service listens on `http://127.0.0.1:8080` by default and creates `data/slid
 
 This backup service is independent from the Vercel database. Switching the public domain or the firmware API endpoint to the Orange Pi does not restore Vercel's stored data unless a separate database backup or synchronization process is configured.
 
-## Data and device behavior
+## Automatic browser alerts
+
+The website checks incoming raw readings directly. MPU baseline calibration and firmware Experimental Test mode are not prerequisites. Default MPU levels are CAUTION at 3°, WARNING at 5°, and CRITICAL at 10°, using `max(abs(pitch_deg), abs(roll_deg))`. Soil and rain generate CAUTION at raw ADC ≥ 3000. Limits are inclusive and editable in **Station settings**; choose ≤ for ADC sensors whose readings decrease when wet. A tilted installation can trigger immediately because the angle is relative to the sensor axes, not a mounted baseline.
+
+Settings persist per station in the browser, with a session-only fallback when storage is unavailable. Browser events are labeled **BROWSER**, kept for the page session (up to 100), and acknowledged locally. Firmware-reported **DEVICE** events retain their server-side history and acknowledgment. Raw signed pitch/roll, temperature, and humidity displays remain available; charts and history use the MPU alert angle and raw soil ADC.
+
+Keep the page open, visible, and connected for monitoring. Each fresh incoming reading is checked immediately; repeated over-limit readings update the same event, escalation notifies again, and fresh normal readings clear the condition. Stale, invalid, or non-ONLINE sensor readings pause evaluation and leave ongoing conditions marked unknown. These alerts do not activate a hardware alarm or the LCD. The Vercel device API, database, authentication for devices, and retained maintenance endpoints are unchanged.
+
+`npm run build` includes the browser alert module in the public output, and the backup server serves the same module. The service worker caches the updated shell but never API responses.
+
+## Data retention and device delivery
 
 - The Vercel API stores device state, readings, alerts, acknowledgments, and commands in Postgres. It prunes readings older than 30 days as new telemetry arrives.
 - The Orange Pi backup stores the same API contract in SQLite when run independently.

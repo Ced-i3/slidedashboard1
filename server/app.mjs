@@ -21,7 +21,7 @@ const MIME = new Map([
   ['.css', 'text/css; charset=utf-8'], ['.webmanifest', 'application/manifest+json'],
   ['.png', 'image/png'], ['.svg', 'image/svg+xml'], ['.ico', 'image/x-icon'],
 ]);
-const STATIC_FILES = new Set(['/index.html', '/app.js', '/styles.css', '/manifest.webmanifest', '/sw.js']);
+const STATIC_FILES = new Set(['/index.html', '/app.js', '/threshold-alerts.js', '/styles.css', '/manifest.webmanifest', '/sw.js']);
 
 function fatal(message) {
   process.stderr.write(`S.L.I.D.E. startup error: ${message}\n`);

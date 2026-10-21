@@ -11,3 +11,6 @@
 .pair-reading>span{flex:1;min-width:0}
 .pair-reading small{display:block;margin:7px 0 0;font-size:12px;letter-spacing:0;color:var(--muted)}
 @media(max-width:620px){.pair-reading{gap:10px;font-size:34px}}
+
+/* Browser threshold controls */
+#threshold-banner{font-weight:650}.modal{max-height:85vh;overflow:auto}.form select{max-width:190px;width:100%}.command-panel>p{color:var(--muted);line-height:1.6;font-size:13px}#alertCount[hidden]{display:none}
